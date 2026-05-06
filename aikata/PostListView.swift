@@ -188,59 +188,57 @@ struct PostListView: View {
                 // Header: Avatar + User Info + Time
                 HStack(alignment: .center, spacing: 12) {
                     // Avatar
-                    AsyncImage(url: URL(string: post.userProfileImageUrl ?? "")) { image in
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                    } placeholder: {
-                        Image(systemName: "person.circle.fill")
-                            .resizable()
-                            .foregroundColor(Color(hex: "#E0E0E0"))
-                    }
-                    .frame(width: avatarSize, height: avatarSize)
-                    .clipShape(Circle())
-                    .padding(.bottom, 8)
-                    
-                    // User Info
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack(alignment: .top) {
-                            Text(post.userName)
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundColor(Color(hex: "#1A1A1A"))
-                                .lineSpacing(8) // Approx line height 24
+                AsyncImage(url: URL(string: post.userProfileImageUrl ?? "")) { image in
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                } placeholder: {
+                    Image(systemName: "person.circle.fill")
+                        .resizable()
+                        .foregroundColor(Color(hex: "#E0E0E0"))
+                }
+                .frame(width: avatarSize, height: avatarSize)
+                .clipShape(Circle())
+                
+                // User Info
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(alignment: .top) {
+                        Text(post.userName)
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(Color(hex: "#1A1A1A"))
+                            .lineSpacing(8) // Approx line height 24
+                        
+                        Spacer()
+                        
+                        // Relative Time
+                        HStack(spacing: 8) {
+                            Text(post.createdAt.relativeTimeString())
+                                .font(.system(size: 12, weight: .regular))
+                                .foregroundColor(Color(hex: "#999999"))
                             
-                            Spacer()
-                            
-                            // Relative Time
-                            HStack(spacing: 8) {
-                                Text(post.createdAt.relativeTimeString())
-                                    .font(.system(size: 12, weight: .regular))
-                                    .foregroundColor(Color(hex: "#999999"))
-                                
-                                Menu {
-                                    Button(role: .destructive, action: {
-                                        // Set state to show report view
-                                        NotificationCenter.default.post(name: NSNotification.Name("ShowReportView"), object: nil, userInfo: ["post": post])
-                                    }) {
-                                        Label("違反を報告する", systemImage: "exclamationmark.triangle")
-                                    }
-                                } label: {
-                                    Image(systemName: "ellipsis")
-                                        .foregroundColor(Color(hex: "#999999"))
-                                        .padding(4)
+                            Menu {
+                                Button(role: .destructive, action: {
+                                    // Set state to show report view
+                                    NotificationCenter.default.post(name: NSNotification.Name("ShowReportView"), object: nil, userInfo: ["post": post])
+                                }) {
+                                    Label("違反を報告する", systemImage: "exclamationmark.triangle")
                                 }
+                            } label: {
+                                Image(systemName: "ellipsis")
+                                    .foregroundColor(Color(hex: "#999999"))
+                                    .padding(4)
                             }
                         }
-                        
-                        Text("\(post.userAge.map { "\($0)歳" } ?? "年齢非公開")・\(post.userJob ?? "職業非公開")")
-                            .font(.system(size: 14, weight: .regular))
-                            .foregroundColor(Color(hex: "#666666"))
                     }
-                    .frame(maxHeight: .infinity, alignment: .center)
+                    
+                    Text("\(post.userAge.map { "\($0)歳" } ?? "年齢非公開")・\(post.userJob ?? "職業非公開")")
+                        .font(.system(size: 14, weight: .regular))
+                        .foregroundColor(Color(hex: "#666666"))
                 }
-                
-                // Regions
-                if !post.regions.isEmpty {
+            }
+            
+            // Regions
+            if !post.regions.isEmpty {
                     HStack(alignment: .center, spacing: 8) {
                         Text("募集中のエリア")
                             .font(.system(size: 12, weight: .medium))
