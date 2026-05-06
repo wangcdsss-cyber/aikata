@@ -99,6 +99,9 @@ struct PostListView: View {
                 }
             }
             .onAppear {
+                // Set UIRefreshControl tint color to white globally for this view
+                UIRefreshControl.appearance().tintColor = UIColor.white
+                
                 if let user = authManager.currentUser {
                     Task {
                         await firestoreService.fetchPosts(for: user.gender)
