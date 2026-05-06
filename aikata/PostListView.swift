@@ -29,6 +29,14 @@ struct PostListView: View {
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                                 
+                                if let error = firestoreService.errorMessage {
+                                    Text(error)
+                                        .foregroundColor(.red)
+                                        .font(.caption)
+                                        .multilineTextAlignment(.center)
+                                        .padding(.horizontal)
+                                }
+                                
                                 Button("再読み込み") {
                                     if let user = authManager.currentUser {
                                         Task {
@@ -38,9 +46,16 @@ struct PostListView: View {
                                 }
                                 .padding(.top, 8)
                             }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
                         } else if firestoreService.posts.isEmpty && firestoreService.isFetching {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            VStack {
+                                Spacer()
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                    .scaleEffect(1.5)
+                                Spacer()
+                            }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
                         } else {
                             ScrollView {
                                 LazyVStack(spacing: 0) { // Changed to 0 spacing for divider control
@@ -49,7 +64,7 @@ struct PostListView: View {
                                         .padding(.horizontal, 16)
                                         
                                     ForEach(firestoreService.posts) { post in
-                                        PostRow(post: post, screenWidth: mainGeometry.size.width)
+                                        PostRow(post: post, screenWidth: mainGeometry.size.width, currentUserId: authManager.currentUser?.id)
                                         
                                         Divider()
                                             .background(Color(hex: "#333333")) // Subtle light/gray divider
@@ -115,8 +130,17 @@ struct PostListView: View {
                     }
                     .onAppear {
                         // Set global appearances for this view
+                        let appearance = UINavigationBarAppearance()
+                        appearance.configureWithOpaqueBackground()
+                        appearance.backgroundColor = .black
+                        appearance.titleTextAttributes = [.foregroundColor: UIColor.white]
+                        appearance.largeTitleTextAttributes = [.foregroundColor: UIColor.white]
+                        
+                        UINavigationBar.appearance().standardAppearance = appearance
+                        UINavigationBar.appearance().scrollEdgeAppearance = appearance
+                        UINavigationBar.appearance().compactAppearance = appearance
+                        
                         UIRefreshControl.appearance().tintColor = UIColor.white
-                        UINavigationBar.appearance().titleTextAttributes = [.foregroundColor: UIColor.white]
                         
                         if let user = authManager.currentUser {
                             Task {
@@ -180,6 +204,7 @@ struct PostListView: View {
     struct PostRow: View {
         let post: Post
         let screenWidth: CGFloat
+        let currentUserId: String?
         @State private var isExpanded = false
         
         var body: some View {
@@ -275,10 +300,37 @@ struct PostListView: View {
                         }
                     }
                 }
+                
+                if currentUserId != post.userId {
+                    HStack {
+                        Spacer()
+                        // Use a button that activates a programmatic NavigationLink to prevent heavy pre-initialization
+                        NavigationLink(destination: LazyView(ChatRoomView(partnerId: post.userId, partnerName: post.userName, partnerImageUrl: post.userProfileImageUrl))) {
+                            Text("メッセージ")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 8)
+                                .background(Color(hex: "#3182F6"))
+                                .cornerRadius(16)
+                        }
+                    }
+                }
             }
             .padding(.horizontal, horizontalPadding)
             .padding(.vertical, 16)
             .background(Color.black)
         }
+    }
+}
+
+// Wrapper to defer initialization of destination views in NavigationLink
+public struct LazyView<Content: View>: View {
+    let build: () -> Content
+    public init(_ build: @autoclosure @escaping () -> Content) {
+        self.build = build
+    }
+    public var body: Content {
+        build()
     }
 }

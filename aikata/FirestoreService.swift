@@ -37,7 +37,19 @@ class FirestoreService: ObservableObject {
             
             query = query.order(by: "createdAt", descending: true).limit(to: pageSize)
             
-            let snapshot = try await query.getDocuments()
+            // Use TaskGroup to add a timeout for fetching in case simulator network is unreachable
+            let snapshot = try await withThrowingTaskGroup(of: QuerySnapshot.self) { group in
+                group.addTask {
+                    return try await query.getDocuments()
+                }
+                group.addTask {
+                    try await Task.sleep(nanoseconds: 10_000_000_000) // 10 seconds timeout
+                    throw NSError(domain: "NetworkTimeout", code: -1, userInfo: [NSLocalizedDescriptionKey: "ネットワークに接続できません。通信環境を確認してください。"])
+                }
+                let result = try await group.next()!
+                group.cancelAll()
+                return result
+            }
             
             var fetchedPosts = snapshot.documents.compactMap { document -> Post? in
                 var post = try? document.data(as: Post.self)
@@ -89,7 +101,18 @@ class FirestoreService: ObservableObject {
                 .start(afterDocument: lastDoc)
                 .limit(to: pageSize)
             
-            let snapshot = try await query.getDocuments()
+            let snapshot = try await withThrowingTaskGroup(of: QuerySnapshot.self) { group in
+                group.addTask {
+                    return try await query.getDocuments()
+                }
+                group.addTask {
+                    try await Task.sleep(nanoseconds: 10_000_000_000)
+                    throw NSError(domain: "NetworkTimeout", code: -1, userInfo: [NSLocalizedDescriptionKey: "ネットワークに接続できません。通信環境を確認してください。"])
+                }
+                let result = try await group.next()!
+                group.cancelAll()
+                return result
+            }
             
             var fetchedPosts = snapshot.documents.compactMap { document -> Post? in
                 var post = try? document.data(as: Post.self)
@@ -179,5 +202,91 @@ class FirestoreService: ObservableObject {
         reportToSave.id = docRef.documentID
         
         try docRef.setData(from: reportToSave)
+    }
+    
+    // MARK: - Chat Methods
+    
+    // Fetch initial chat messages (30 items)
+    func fetchInitialMessages(chatRoomId: String) async throws -> [Message] {
+        let query = db.collection("messages")
+            .whereField("chatRoomId", isEqualTo: chatRoomId)
+            .order(by: "createdAt", descending: true)
+            .limit(to: 30)
+        
+        let snapshot = try await query.getDocuments()
+        let messages = snapshot.documents.compactMap { document -> Message? in
+            var message = try? document.data(as: Message.self)
+            message?.id = document.documentID
+            return message
+        }
+        
+        // Reverse to chronological order (oldest first, newest at bottom)
+        return messages.reversed()
+    }
+    
+    // Fetch older chat messages (Pagination)
+    func fetchOlderMessages(chatRoomId: String, before timestamp: Date) async throws -> [Message] {
+        let query = db.collection("messages")
+            .whereField("chatRoomId", isEqualTo: chatRoomId)
+            .order(by: "createdAt", descending: true)
+            .start(after: [timestamp])
+            .limit(to: 30)
+        
+        let snapshot = try await query.getDocuments()
+        let messages = snapshot.documents.compactMap { document -> Message? in
+            var message = try? document.data(as: Message.self)
+            message?.id = document.documentID
+            return message
+        }
+        
+        return messages.reversed()
+    }
+    
+    // Send a message
+    func sendMessage(chatRoomId: String, senderId: String, receiverId: String, content: String) async throws -> Message {
+        var message = Message(
+            id: UUID().uuidString, // Temporary ID, will be replaced by Firestore ID
+            chatRoomId: chatRoomId,
+            senderId: senderId,
+            receiverId: receiverId,
+            content: content,
+            createdAt: Date()
+        )
+        
+        let docRef = db.collection("messages").document()
+        message.id = docRef.documentID
+        
+        try docRef.setData(from: message)
+        return message
+    }
+    
+    // Listen for new messages (Real-time updates)
+    func listenForNewMessages(chatRoomId: String, after timestamp: Date, completion: @escaping ([Message]) -> Void) -> ListenerRegistration {
+        let query = db.collection("messages")
+            .whereField("chatRoomId", isEqualTo: chatRoomId)
+            .order(by: "createdAt", descending: true)
+            .end(before: [timestamp]) // Fetch only messages newer than the given timestamp
+        
+        return query.addSnapshotListener { snapshot, error in
+            guard let snapshot = snapshot else {
+                print("Error listening for new messages: \(error?.localizedDescription ?? "Unknown error")")
+                return
+            }
+            
+            var newMessages: [Message] = []
+            for change in snapshot.documentChanges {
+                if change.type == .added {
+                    if var message = try? change.document.data(as: Message.self) {
+                        message.id = change.document.documentID
+                        newMessages.append(message)
+                    }
+                }
+            }
+            
+            if !newMessages.isEmpty {
+                // Reverse to chronological order
+                completion(newMessages.reversed())
+            }
+        }
     }
 }

@@ -48,6 +48,19 @@ struct Report: Codable, Identifiable {
     var createdAt: Date
 }
 
+struct Message: Codable, Identifiable, Equatable {
+    var id: String?
+    var chatRoomId: String
+    var senderId: String
+    var receiverId: String
+    var content: String
+    var createdAt: Date
+    
+    static func == (lhs: Message, rhs: Message) -> Bool {
+        return lhs.id == rhs.id
+    }
+}
+
 struct PostFilter: Equatable {
     var regions: [String] = []
     var minAge: Int = 18
