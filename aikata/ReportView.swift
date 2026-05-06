@@ -92,6 +92,7 @@ struct ReportView: View {
                             }
                             
                             TextEditor(text: $descriptionText)
+                                .scrollContentBackground(.hidden) // Required to make background color work in iOS 16+
                                 .padding(8)
                                 .frame(height: 150)
                                 .background(Color.black)
