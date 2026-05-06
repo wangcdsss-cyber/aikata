@@ -181,13 +181,12 @@ struct PostListView: View {
         @State private var isExpanded = false
         
         var body: some View {
-            let isSmallScreen = screenWidth <= 375
-            let horizontalPadding: CGFloat = isSmallScreen ? 12 : 16
-            let avatarSize: CGFloat = isSmallScreen ? 48 : 64
+            let horizontalPadding: CGFloat = screenWidth <= 375 ? 12 : 16
+            let avatarSize: CGFloat = screenWidth <= 375 ? 48 : 64
             
             VStack(alignment: .leading, spacing: 12) {
                 // Header: Avatar + User Info + Time
-                HStack(alignment: .top, spacing: 12) {
+                HStack(alignment: .center, spacing: 12) {
                     // Avatar
                     AsyncImage(url: URL(string: post.userProfileImageUrl ?? "")) { image in
                         image
@@ -196,11 +195,11 @@ struct PostListView: View {
                     } placeholder: {
                         Image(systemName: "person.circle.fill")
                             .resizable()
-                            .foregroundColor(.gray)
+                            .foregroundColor(Color(hex: "#E0E0E0"))
                     }
                     .frame(width: avatarSize, height: avatarSize)
                     .clipShape(Circle())
-                    .padding(.bottom, 8) // Align with right info
+                    .padding(.bottom, 8)
                     
                     // User Info
                     VStack(alignment: .leading, spacing: 4) {
@@ -208,12 +207,12 @@ struct PostListView: View {
                             Text(post.userName)
                                 .font(.system(size: 16, weight: .semibold))
                                 .foregroundColor(Color(hex: "#1A1A1A"))
-                                .lineLimit(1)
+                                .lineSpacing(8) // Approx line height 24
                             
                             Spacer()
                             
                             // Relative Time
-                            HStack(spacing: 4) {
+                            HStack(spacing: 8) {
                                 Text(post.createdAt.relativeTimeString())
                                     .font(.system(size: 12, weight: .regular))
                                     .foregroundColor(Color(hex: "#999999"))
@@ -236,14 +235,13 @@ struct PostListView: View {
                         Text("\(post.userAge.map { "\($0)歳" } ?? "年齢非公開")・\(post.userJob ?? "職業非公開")")
                             .font(.system(size: 14, weight: .regular))
                             .foregroundColor(Color(hex: "#666666"))
-                            .lineSpacing(6) // Approx line height 20
                     }
                     .frame(maxHeight: .infinity, alignment: .center)
                 }
                 
                 // Regions
                 if !post.regions.isEmpty {
-                    VStack(alignment: .leading, spacing: 6) {
+                    HStack(alignment: .center, spacing: 8) {
                         Text("募集中のエリア")
                             .font(.system(size: 12, weight: .medium))
                             .foregroundColor(Color(hex: "#999999"))
