@@ -78,55 +78,69 @@ struct PostListView: View {
                 }
                 .background(Color.black.edgesIgnoringSafeArea(.all))
                 .navigationTitle("\(authManager.currentUser?.gender.rawValue ?? "")掲示板")
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button(action: {
+                            // Logout or Reset for testing
+                            UserDefaults.standard.removeObject(forKey: "app_user")
+                            authManager.currentUser = nil
+                        }) {
+                            Text("リセット")
+                                .font(.caption)
+                        }
+                    }
+                }
+                .sheet(isPresented: $isShowingCreatePost) {
+                    if let user = authManager.currentUser {
+                        CreatePostView(user: user)
+                            .environmentObject(firestoreService)
+                    }
+                }
+                .onAppear {
+                    // Set UIRefreshControl tint color to white globally for this view
+                    UIRefreshControl.appearance().tintColor = UIColor.white
+                    
+                    if let user = authManager.currentUser {
+                        Task {
+                            await firestoreService.fetchPosts(for: user.gender)
+                        }
+                    }
+                }
+                .onReceive(showReportPublisher) { notification in
+                    if let userInfo = notification.userInfo, let post = userInfo["post"] as? Post {
+                        self.selectedPostToReport = post
+                    }
+                }
+                .sheet(item: $selectedPostToReport) { post in
+                    if let currentUser = authManager.currentUser {
+                        ReportView(
+                            postId: post.id ?? "",
+                            reportedUserId: post.userId,
+                            currentUser: currentUser
+                        )
+                        .environmentObject(firestoreService)
+                    }
+                }
+            }
+            
+            // Floating Action Button
+            VStack {
+                Spacer()
+                HStack {
+                    Spacer()
                     Button(action: {
                         isShowingCreatePost = true
                     }) {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.title2)
+                        Image(systemName: "plus")
+                            .font(.system(size: 24, weight: .bold))
+                            .foregroundColor(.white)
+                            .frame(width: 56, height: 56)
+                            .background(Color(hex: "#3182F6").opacity(0.8))
+                            .clipShape(Circle())
+                            .shadow(color: Color.black.opacity(0.3), radius: 4, x: 0, y: 2)
                     }
-                }
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button(action: {
-                        // Logout or Reset for testing
-                        UserDefaults.standard.removeObject(forKey: "app_user")
-                        authManager.currentUser = nil
-                    }) {
-                        Text("リセット")
-                            .font(.caption)
-                    }
-                }
-            }
-            .sheet(isPresented: $isShowingCreatePost) {
-                if let user = authManager.currentUser {
-                    CreatePostView(user: user)
-                        .environmentObject(firestoreService)
-                }
-            }
-            .onAppear {
-                // Set UIRefreshControl tint color to white globally for this view
-                UIRefreshControl.appearance().tintColor = UIColor.white
-                
-                if let user = authManager.currentUser {
-                    Task {
-                        await firestoreService.fetchPosts(for: user.gender)
-                    }
-                }
-            }
-            .onReceive(showReportPublisher) { notification in
-                if let userInfo = notification.userInfo, let post = userInfo["post"] as? Post {
-                    self.selectedPostToReport = post
-                }
-            }
-            .sheet(item: $selectedPostToReport) { post in
-                if let currentUser = authManager.currentUser {
-                    ReportView(
-                        postId: post.id ?? "",
-                        reportedUserId: post.userId,
-                        currentUser: currentUser
-                    )
-                    .environmentObject(firestoreService)
+                    .padding(.trailing, 20)
+                    .padding(.bottom, 20)
                 }
             }
         }
