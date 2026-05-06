@@ -125,4 +125,23 @@ class FirestoreService: ObservableObject {
         guard let id = user.id else { return }
         try db.collection("users").document(id).setData(from: user)
     }
+    
+    // Submit a report
+    func submitReport(postId: String, reportedUserId: String, reporter: AppUser, reportType: String, description: String) async throws {
+        let report = Report(
+            postId: postId,
+            reportedUserId: reportedUserId,
+            reporterId: reporter.id ?? "unknown",
+            reporterName: reporter.name,
+            reportType: reportType,
+            description: description,
+            createdAt: Date()
+        )
+        
+        let docRef = db.collection("report").document()
+        var reportToSave = report
+        reportToSave.id = docRef.documentID
+        
+        try docRef.setData(from: reportToSave)
+    }
 }

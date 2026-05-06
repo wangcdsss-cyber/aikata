@@ -1,9 +1,15 @@
 import SwiftUI
+import UIKit
 
 struct PostListView: View {
     @EnvironmentObject var authManager: AuthManager
     @StateObject private var firestoreService = FirestoreService()
     @State private var isShowingCreatePost = false
+    
+    // For Report View
+    @State private var selectedPostToReport: Post? = nil
+    
+    let showReportPublisher = NotificationCenter.default.publisher(for: NSNotification.Name("ShowReportView"))
     
     var body: some View {
         // Read screen width to pass down instead of using GeometryReader inside each row
@@ -108,6 +114,21 @@ struct PostListView: View {
                     }
                 }
             }
+            .onReceive(showReportPublisher) { notification in
+                if let userInfo = notification.userInfo, let post = userInfo["post"] as? Post {
+                    self.selectedPostToReport = post
+                }
+            }
+            .sheet(item: $selectedPostToReport) { post in
+                if let currentUser = authManager.currentUser {
+                    ReportView(
+                        postId: post.id ?? "",
+                        reportedUserId: post.userId,
+                        currentUser: currentUser
+                    )
+                    .environmentObject(firestoreService)
+                }
+            }
         }
     }
 }
@@ -155,11 +176,17 @@ struct PostRow: View {
                                     .font(.system(size: 12, weight: .regular))
                                     .foregroundColor(Color(hex: "#999999"))
                                 
-                                Button(action: {
-                                    // More action
-                                }) {
+                                Menu {
+                                    Button(role: .destructive, action: {
+                                        // Set state to show report view
+                                        NotificationCenter.default.post(name: NSNotification.Name("ShowReportView"), object: nil, userInfo: ["post": post])
+                                    }) {
+                                        Label("違反を報告する", systemImage: "exclamationmark.triangle")
+                                    }
+                                } label: {
                                     Image(systemName: "ellipsis")
                                         .foregroundColor(Color(hex: "#999999"))
+                                        .padding(4)
                                 }
                             }
                         }
