@@ -296,8 +296,3 @@ struct PostRow: View {
             .frame(maxWidth: 640)
     }
 }
-
-#Preview {
-    PostListView()
-        .environmentObject(AuthManager())
-}
