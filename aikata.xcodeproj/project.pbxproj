@@ -6,6 +6,15 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		99121BCC2FAAFF4900171F8F /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = 99121BCB2FAAFF4900171F8F /* FirebaseAnalytics */; };
+		99121BCE2FAAFF4900171F8F /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 99121BCD2FAAFF4900171F8F /* FirebaseAuth */; };
+		99121BD02FAAFF4900171F8F /* FirebaseCrashlytics in Frameworks */ = {isa = PBXBuildFile; productRef = 99121BCF2FAAFF4900171F8F /* FirebaseCrashlytics */; };
+		99121BD22FAAFF4900171F8F /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 99121BD12FAAFF4900171F8F /* FirebaseFirestore */; };
+		99121BD42FAAFF4900171F8F /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = 99121BD32FAAFF4900171F8F /* FirebaseMessaging */; };
+		99121BD62FAAFF4900171F8F /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = 99121BD52FAAFF4900171F8F /* FirebaseStorage */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		99121B4D2FAAF48C00171F8F /* aikata.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = aikata.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -23,6 +32,12 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				99121BD02FAAFF4900171F8F /* FirebaseCrashlytics in Frameworks */,
+				99121BD22FAAFF4900171F8F /* FirebaseFirestore in Frameworks */,
+				99121BD42FAAFF4900171F8F /* FirebaseMessaging in Frameworks */,
+				99121BCC2FAAFF4900171F8F /* FirebaseAnalytics in Frameworks */,
+				99121BCE2FAAFF4900171F8F /* FirebaseAuth in Frameworks */,
+				99121BD62FAAFF4900171F8F /* FirebaseStorage in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -65,6 +80,12 @@
 			);
 			name = aikata;
 			packageProductDependencies = (
+				99121BCB2FAAFF4900171F8F /* FirebaseAnalytics */,
+				99121BCD2FAAFF4900171F8F /* FirebaseAuth */,
+				99121BCF2FAAFF4900171F8F /* FirebaseCrashlytics */,
+				99121BD12FAAFF4900171F8F /* FirebaseFirestore */,
+				99121BD32FAAFF4900171F8F /* FirebaseMessaging */,
+				99121BD52FAAFF4900171F8F /* FirebaseStorage */,
 			);
 			productName = aikata;
 			productReference = 99121B4D2FAAF48C00171F8F /* aikata.app */;
@@ -86,14 +107,18 @@
 				};
 			};
 			buildConfigurationList = 99121B482FAAF48C00171F8F /* Build configuration list for PBXProject "aikata" */;
-			developmentRegion = en;
+			developmentRegion = ja;
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				en,
 				Base,
+				ja,
 			);
 			mainGroup = 99121B442FAAF48C00171F8F;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				99121BCA2FAAFF4900171F8F /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 99121B4E2FAAF48C00171F8F /* Products */;
 			projectDirPath = "";
@@ -261,6 +286,7 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -293,6 +319,7 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -332,6 +359,50 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		99121BCA2FAAFF4900171F8F /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 12.13.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		99121BCB2FAAFF4900171F8F /* FirebaseAnalytics */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 99121BCA2FAAFF4900171F8F /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAnalytics;
+		};
+		99121BCD2FAAFF4900171F8F /* FirebaseAuth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 99121BCA2FAAFF4900171F8F /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAuth;
+		};
+		99121BCF2FAAFF4900171F8F /* FirebaseCrashlytics */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 99121BCA2FAAFF4900171F8F /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseCrashlytics;
+		};
+		99121BD12FAAFF4900171F8F /* FirebaseFirestore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 99121BCA2FAAFF4900171F8F /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFirestore;
+		};
+		99121BD32FAAFF4900171F8F /* FirebaseMessaging */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 99121BCA2FAAFF4900171F8F /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseMessaging;
+		};
+		99121BD52FAAFF4900171F8F /* FirebaseStorage */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 99121BCA2FAAFF4900171F8F /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseStorage;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 99121B452FAAF48C00171F8F /* Project object */;
 }
