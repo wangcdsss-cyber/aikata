@@ -36,3 +36,14 @@ struct Post: Codable, Identifiable {
     var regions: [String]
     var createdAt: Date
 }
+
+struct Report: Codable, Identifiable {
+    var id: String?
+    var postId: String
+    var reportedUserId: String
+    var reporterId: String
+    var reporterName: String
+    var reportType: String
+    var description: String
+    var createdAt: Date
+}
