@@ -42,37 +42,33 @@ struct PostListView: View {
                             ProgressView()
                                 .progressViewStyle(CircularProgressViewStyle(tint: .white))
                         } else {
-                            List {
-                                ForEach(firestoreService.posts) { post in
-                                    PostRow(post: post, screenWidth: mainGeometry.size.width)
-                                        .listRowInsets(EdgeInsets())
-                                        .listRowSeparator(.hidden)
-                                        .listRowBackground(Color.black)
-                                        .padding(.vertical, 8)
-                                        .padding(.horizontal, 16)
-                                }
-                                
-                                // Infinite Scroll Loading Indicator
-                                if firestoreService.hasMore {
-                                    HStack {
-                                        Spacer()
-                                        ProgressView()
-                                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                            .onAppear {
-                                                if let user = authManager.currentUser {
-                                                    Task {
-                                                        await firestoreService.fetchMorePosts(for: user.gender, filter: postFilter.isActive ? postFilter : nil, currentUserId: user.id)
+                            ScrollView {
+                                LazyVStack(spacing: 0) { // Changed to 0 spacing for divider control
+                                    ForEach(firestoreService.posts) { post in
+                                        PostRow(post: post, screenWidth: mainGeometry.size.width)
+                                        
+                                        Divider()
+                                            .background(Color(hex: "#333333")) // Subtle light/gray divider
+                                            .padding(.horizontal, 16)
+                                            
+                                        // Pagination trigger
+                                        if post.id == firestoreService.posts.last?.id && firestoreService.hasMore {
+                                            ProgressView()
+                                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                                .padding()
+                                                .onAppear {
+                                                    if let user = authManager.currentUser {
+                                                        Task {
+                                                            await firestoreService.fetchMorePosts(for: user.gender, filter: postFilter.isActive ? postFilter : nil, currentUserId: user.id)
+                                                        }
                                                     }
                                                 }
-                                            }
-                                        Spacer()
+                                        }
                                     }
-                                    .listRowBackground(Color.black)
-                                    .listRowInsets(EdgeInsets())
-                                    .padding(.vertical, 20)
                                 }
+                                .padding(.top, 16)
+                                .padding(.bottom, 80) // FAB padding
                             }
-                            .listStyle(PlainListStyle())
                             .background(Color.black)
                             .refreshable {
                                 if let user = authManager.currentUser {
@@ -205,7 +201,7 @@ struct PostListView: View {
                     HStack(alignment: .top) {
                         Text(post.userName)
                             .font(.system(size: 16, weight: .semibold))
-                            .foregroundColor(Color(hex: "#1A1A1A"))
+                            .foregroundColor(.white)
                             .lineSpacing(8) // Approx line height 24
                         
                         Spacer()
@@ -233,27 +229,23 @@ struct PostListView: View {
                     
                     Text("\(post.userAge.map { "\($0)歳" } ?? "年齢非公開")・\(post.userJob ?? "職業非公開")")
                         .font(.system(size: 14, weight: .regular))
-                        .foregroundColor(Color(hex: "#666666"))
+                        .foregroundColor(Color(hex: "#CCCCCC"))
                 }
             }
             
             // Regions
             if !post.regions.isEmpty {
                     HStack(alignment: .center, spacing: 8) {
-                        Text("募集中のエリア")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(Color(hex: "#999999"))
+                        Text("希望地域:")
+                            .font(.system(size: 14, weight: .regular))
+                            .foregroundColor(Color(hex: "#CCCCCC"))
                             .kerning(0.5)
                         
                         FlowLayout(spacing: 6) {
                             ForEach(post.regions, id: \.self) { region in
                                 Text(region)
-                                    .font(.system(size: 14, weight: .medium))
-                                    .foregroundColor(.white)
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 4)
-                                    .background(Color(hex: "#3182F6"))
-                                    .cornerRadius(4)
+                                    .font(.system(size: 14, weight: .regular))
+                                    .foregroundColor(Color(hex: "#CCCCCC"))
                             }
                         }
                     }
@@ -261,13 +253,9 @@ struct PostListView: View {
                 
                 // Content
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("募集内容")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(Color(hex: "#1A1A1A"))
-                    
                     Text(post.content)
-                        .font(.system(size: 14, weight: .regular))
-                        .foregroundColor(Color(hex: "#333333"))
+                        .font(.system(size: 15, weight: .regular))
+                        .foregroundColor(.white)
                         .lineSpacing(4) // Approx 1.6 line height
                         .lineLimit(5) // Limit to 5 lines
                         .truncationMode(.tail)
@@ -276,7 +264,7 @@ struct PostListView: View {
                     if post.content.components(separatedBy: .newlines).count > 5 || post.content.count > 150 {
                         NavigationLink(destination: PostDetailView(post: post)) {
                             Text("更に表示")
-                                .font(.system(size: 14))
+                                .font(.system(size: 15))
                                 .foregroundColor(.blue)
                         }
                     }
@@ -284,9 +272,7 @@ struct PostListView: View {
             }
             .padding(.horizontal, horizontalPadding)
             .padding(.vertical, 16)
-            .background(Color.white)
-            .cornerRadius(8)
-            .shadow(color: Color.black.opacity(0.08), radius: 4, x: 0, y: 2)
+            .background(Color.black)
         }
     }
 }
