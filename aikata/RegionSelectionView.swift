@@ -83,13 +83,13 @@ struct RegionSelectionView: View {
                     }) {
                         Text("キャンセル")
                             .foregroundColor(.blue)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 16)
-                            .background(Color(.darkGray))
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
                     
-                    Divider() // Adds a separator line between buttons if needed, or you can just use borders
-                        .background(Color.gray)
+                    Rectangle()
+                        .fill(Color.gray.opacity(0.3))
+                        .frame(width: 1)
+                        .padding(.vertical, 8)
                     
                     Button(action: {
                         selectedRegions = tempSelectedRegions
@@ -98,11 +98,10 @@ struct RegionSelectionView: View {
                         Text("OK")
                             .foregroundColor(.blue)
                             .fontWeight(.bold)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 16)
-                            .background(Color(.darkGray))
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
                 }
+                .frame(height: 50) // Set a fixed, smaller height for the button area
                 .background(Color(.darkGray))
             }
             .navigationTitle("地域")

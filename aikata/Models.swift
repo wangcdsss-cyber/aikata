@@ -47,3 +47,14 @@ struct Report: Codable, Identifiable {
     var description: String
     var createdAt: Date
 }
+
+struct PostFilter: Equatable {
+    var regions: [String] = []
+    var minAge: Int = 18
+    var maxAge: Int = 100
+    var onlyMyPosts: Bool = false
+    
+    var isActive: Bool {
+        return !regions.isEmpty || minAge > 18 || maxAge < 100 || onlyMyPosts
+    }
+}
