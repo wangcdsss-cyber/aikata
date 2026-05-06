@@ -83,6 +83,7 @@ struct PostListView: View {
                     }
                     .background(Color.black.edgesIgnoringSafeArea(.all))
                     .navigationTitle("\(authManager.currentUser?.gender.rawValue ?? "")掲示板")
+                    .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
                         ToolbarItem(placement: .navigationBarTrailing) {
                             Button(action: {
@@ -113,8 +114,9 @@ struct PostListView: View {
                         }
                     }
                     .onAppear {
-                        // Set UIRefreshControl tint color to white globally for this view
+                        // Set global appearances for this view
                         UIRefreshControl.appearance().tintColor = UIColor.white
+                        UINavigationBar.appearance().titleTextAttributes = [.foregroundColor: UIColor.white]
                         
                         if let user = authManager.currentUser {
                             Task {
