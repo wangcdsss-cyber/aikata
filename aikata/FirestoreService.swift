@@ -16,24 +16,42 @@ class FirestoreService: ObservableObject {
     
     // Fetch initial posts or pull-to-refresh
     @MainActor
-    func fetchPosts(for gender: Gender, isRefresh: Bool = false) async {
+    func fetchPosts(for gender: Gender, filter: PostFilter? = nil, currentUserId: String? = nil, isRefresh: Bool = false) async {
         guard !isFetching else { return }
         
         isFetching = true
         errorMessage = nil
         
         do {
-            let query = db.collection("posts")
+            var query: Query = db.collection("posts")
                 .whereField("gender", isEqualTo: gender.rawValue)
-                .order(by: "createdAt", descending: true)
-                .limit(to: pageSize)
+            
+            if let filter = filter {
+                if filter.onlyMyPosts, let userId = currentUserId {
+                    query = query.whereField("userId", isEqualTo: userId)
+                }
+                if !filter.regions.isEmpty {
+                    query = query.whereField("regions", arrayContainsAny: filter.regions)
+                }
+            }
+            
+            query = query.order(by: "createdAt", descending: true).limit(to: pageSize)
             
             let snapshot = try await query.getDocuments()
             
-            let fetchedPosts = snapshot.documents.compactMap { document -> Post? in
+            var fetchedPosts = snapshot.documents.compactMap { document -> Post? in
                 var post = try? document.data(as: Post.self)
                 post?.id = document.documentID
                 return post
+            }
+            
+            // Client-side filtering for age to avoid complex composite indexes and preserve chronological order
+            if let filter = filter {
+                fetchedPosts = fetchedPosts.filter { post in
+                    let age = post.userAge ?? 0
+                    if age == 0 { return true } // Include if age is unknown, or adjust logic as needed
+                    return age >= filter.minAge && age <= filter.maxAge
+                }
             }
             
             self.posts = fetchedPosts
@@ -49,24 +67,42 @@ class FirestoreService: ObservableObject {
     
     // Fetch more posts (Infinite scrolling)
     @MainActor
-    func fetchMorePosts(for gender: Gender) async {
+    func fetchMorePosts(for gender: Gender, filter: PostFilter? = nil, currentUserId: String? = nil) async {
         guard !isFetchingMore && hasMore, let lastDoc = lastDocument else { return }
         
         isFetchingMore = true
         
         do {
-            let query = db.collection("posts")
+            var query: Query = db.collection("posts")
                 .whereField("gender", isEqualTo: gender.rawValue)
-                .order(by: "createdAt", descending: true)
+            
+            if let filter = filter {
+                if filter.onlyMyPosts, let userId = currentUserId {
+                    query = query.whereField("userId", isEqualTo: userId)
+                }
+                if !filter.regions.isEmpty {
+                    query = query.whereField("regions", arrayContainsAny: filter.regions)
+                }
+            }
+            
+            query = query.order(by: "createdAt", descending: true)
                 .start(afterDocument: lastDoc)
                 .limit(to: pageSize)
             
             let snapshot = try await query.getDocuments()
             
-            let fetchedPosts = snapshot.documents.compactMap { document -> Post? in
+            var fetchedPosts = snapshot.documents.compactMap { document -> Post? in
                 var post = try? document.data(as: Post.self)
                 post?.id = document.documentID
                 return post
+            }
+            
+            if let filter = filter {
+                fetchedPosts = fetchedPosts.filter { post in
+                    let age = post.userAge ?? 0
+                    if age == 0 { return true }
+                    return age >= filter.minAge && age <= filter.maxAge
+                }
             }
             
             // Deduplicate

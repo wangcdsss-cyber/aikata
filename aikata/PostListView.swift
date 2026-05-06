@@ -9,14 +9,19 @@ struct PostListView: View {
     // For Report View
     @State private var selectedPostToReport: Post? = nil
     
+    // For Filter View
+    @State private var isShowingFilter = false
+    @State private var postFilter = PostFilter()
+    
     let showReportPublisher = NotificationCenter.default.publisher(for: NSNotification.Name("ShowReportView"))
     
     var body: some View {
         // Read screen width to pass down instead of using GeometryReader inside each row
         GeometryReader { mainGeometry in
-            NavigationView {
-                Group {
-                    if firestoreService.posts.isEmpty && !firestoreService.isFetching {
+            ZStack {
+                NavigationView {
+                    Group {
+                        if firestoreService.posts.isEmpty && !firestoreService.isFetching {
                         VStack(spacing: 12) {
                             Text("投稿がありません")
                                 .foregroundColor(.secondary)
@@ -56,7 +61,7 @@ struct PostListView: View {
                                         .onAppear {
                                             if let user = authManager.currentUser {
                                                 Task {
-                                                    await firestoreService.fetchMorePosts(for: user.gender)
+                                                    await firestoreService.fetchMorePosts(for: user.gender, filter: postFilter.isActive ? postFilter : nil, currentUserId: user.id)
                                                 }
                                             }
                                         }
@@ -71,7 +76,7 @@ struct PostListView: View {
                         .background(Color.black)
                         .refreshable {
                             if let user = authManager.currentUser {
-                                await firestoreService.fetchPosts(for: user.gender, isRefresh: true)
+                                await firestoreService.fetchPosts(for: user.gender, filter: postFilter.isActive ? postFilter : nil, currentUserId: user.id, isRefresh: true)
                             }
                         }
                     }
@@ -79,6 +84,17 @@ struct PostListView: View {
                 .background(Color.black.edgesIgnoringSafeArea(.all))
                 .navigationTitle("\(authManager.currentUser?.gender.rawValue ?? "")掲示板")
                 .toolbar {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button(action: {
+                            withAnimation {
+                                isShowingFilter = true
+                            }
+                        }) {
+                            Image(systemName: "slider.horizontal.3")
+                                .font(.headline)
+                                .foregroundColor(.white)
+                        }
+                    }
                     ToolbarItem(placement: .navigationBarLeading) {
                         Button(action: {
                             // Logout or Reset for testing
@@ -102,7 +118,7 @@ struct PostListView: View {
                     
                     if let user = authManager.currentUser {
                         Task {
-                            await firestoreService.fetchPosts(for: user.gender)
+                            await firestoreService.fetchPosts(for: user.gender, filter: postFilter.isActive ? postFilter : nil, currentUserId: user.id)
                         }
                     }
                 }
@@ -142,6 +158,18 @@ struct PostListView: View {
                     .padding(.trailing, 20)
                     .padding(.bottom, 20)
                 }
+            }
+            
+            if isShowingFilter {
+                FilterModalView(filter: $postFilter, isPresented: $isShowingFilter) {
+                    if let user = authManager.currentUser {
+                        Task {
+                            await firestoreService.fetchPosts(for: user.gender, filter: postFilter.isActive ? postFilter : nil, currentUserId: user.id)
+                        }
+                    }
+                }
+                .transition(.opacity)
+                .zIndex(1)
             }
         }
     }
