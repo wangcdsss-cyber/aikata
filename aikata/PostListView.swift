@@ -44,6 +44,10 @@ struct PostListView: View {
                         } else {
                             ScrollView {
                                 LazyVStack(spacing: 0) { // Changed to 0 spacing for divider control
+                                    Divider()
+                                        .background(Color(hex: "#333333")) // Subtle light/gray divider
+                                        .padding(.horizontal, 16)
+                                        
                                     ForEach(firestoreService.posts) { post in
                                         PostRow(post: post, screenWidth: mainGeometry.size.width)
                                         
@@ -66,7 +70,7 @@ struct PostListView: View {
                                         }
                                     }
                                 }
-                                .padding(.top, 16)
+                                .padding(.top, 0) // Reduced top padding to move list higher
                                 .padding(.bottom, 80) // FAB padding
                             }
                             .background(Color.black)
