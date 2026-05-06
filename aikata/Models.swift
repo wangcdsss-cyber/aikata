@@ -18,6 +18,9 @@ struct AppUser: Codable, Identifiable {
     var name: String
     var gender: Gender
     var profileImageUrl: String?
+    var age: Int?
+    var job: String?
+    var residence: String?
     var createdAt: Date
 }
 
@@ -25,7 +28,11 @@ struct Post: Codable, Identifiable {
     var id: String?
     var userId: String
     var userName: String
+    var userAge: Int?
+    var userJob: String?
+    var userProfileImageUrl: String?
     var content: String
     var gender: Gender // The gender of the poster and the target audience
+    var regions: [String]
     var createdAt: Date
 }
