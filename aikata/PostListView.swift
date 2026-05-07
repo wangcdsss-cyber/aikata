@@ -12,6 +12,7 @@ struct PostListView: View {
     // For Filter View
     @State private var isShowingFilter = false
     @State private var postFilter = PostFilter()
+    @State private var isChatRoomPresented = false
     
     let showReportPublisher = NotificationCenter.default.publisher(for: NSNotification.Name("ShowReportView"))
     
@@ -23,39 +24,39 @@ struct PostListView: View {
                     Group {
                         if firestoreService.posts.isEmpty && !firestoreService.isFetching {
                             VStack(spacing: 12) {
-                                Text("投稿がありません")
-                                    .foregroundColor(.secondary)
-                                Text("最初の投稿をしてみましょう！")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                
-                                if let error = firestoreService.errorMessage {
-                                    Text(error)
+                                if let errorMessage = firestoreService.errorMessage {
+                                    Text("読み込みエラー")
                                         .foregroundColor(.red)
+                                    Text(errorMessage)
                                         .font(.caption)
+                                        .foregroundColor(.secondary)
                                         .multilineTextAlignment(.center)
-                                        .padding(.horizontal)
+                                        .padding(.horizontal, 16)
+                                } else {
+                                    Text("投稿がありません")
+                                        .foregroundColor(.secondary)
+                                    Text("最初の投稿をしてみましょう！")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
                                 }
                                 
                                 Button("再読み込み") {
                                     if let user = authManager.currentUser {
                                         Task {
-                                            await firestoreService.fetchPosts(for: user.gender, isRefresh: true)
+                                            await firestoreService.fetchPosts(
+                                                for: user.gender,
+                                                filter: postFilter.isActive ? postFilter : nil,
+                                                currentUserId: user.id,
+                                                isRefresh: true
+                                            )
                                         }
                                     }
                                 }
                                 .padding(.top, 8)
                             }
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
                         } else if firestoreService.posts.isEmpty && firestoreService.isFetching {
-                            VStack {
-                                Spacer()
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                    .scaleEffect(1.5)
-                                Spacer()
-                            }
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
                         } else {
                             ScrollView {
                                 LazyVStack(spacing: 0) { // Changed to 0 spacing for divider control
@@ -64,7 +65,12 @@ struct PostListView: View {
                                         .padding(.horizontal, 16)
                                         
                                     ForEach(firestoreService.posts) { post in
-                                        PostRow(post: post, screenWidth: mainGeometry.size.width, currentUserId: authManager.currentUser?.id)
+                                        PostRow(
+                                            post: post,
+                                            screenWidth: mainGeometry.size.width,
+                                            currentUser: authManager.currentUser,
+                                            isChatRoomPresented: $isChatRoomPresented
+                                        )
                                         
                                         Divider()
                                             .background(Color(hex: "#333333")) // Subtle light/gray divider
@@ -130,17 +136,8 @@ struct PostListView: View {
                     }
                     .onAppear {
                         // Set global appearances for this view
-                        let appearance = UINavigationBarAppearance()
-                        appearance.configureWithOpaqueBackground()
-                        appearance.backgroundColor = .black
-                        appearance.titleTextAttributes = [.foregroundColor: UIColor.white]
-                        appearance.largeTitleTextAttributes = [.foregroundColor: UIColor.white]
-                        
-                        UINavigationBar.appearance().standardAppearance = appearance
-                        UINavigationBar.appearance().scrollEdgeAppearance = appearance
-                        UINavigationBar.appearance().compactAppearance = appearance
-                        
                         UIRefreshControl.appearance().tintColor = UIColor.white
+                        UINavigationBar.appearance().titleTextAttributes = [.foregroundColor: UIColor.white]
                         
                         if let user = authManager.currentUser {
                             Task {
@@ -166,23 +163,25 @@ struct PostListView: View {
                 }
                 
                 // Floating Action Button
-                VStack {
-                    Spacer()
-                    HStack {
+                if !isChatRoomPresented {
+                    VStack {
                         Spacer()
-                        Button(action: {
-                            isShowingCreatePost = true
-                        }) {
-                            Image(systemName: "plus")
-                                .font(.system(size: 24, weight: .bold))
-                                .foregroundColor(.white)
-                                .frame(width: 56, height: 56)
-                                .background(Color(hex: "#3182F6").opacity(0.8))
-                                .clipShape(Circle())
-                                .shadow(color: Color.black.opacity(0.3), radius: 4, x: 0, y: 2)
+                        HStack {
+                            Spacer()
+                            Button(action: {
+                                isShowingCreatePost = true
+                            }) {
+                                Image(systemName: "plus")
+                                    .font(.system(size: 24, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .frame(width: 56, height: 56)
+                                    .background(Color(hex: "#3182F6").opacity(0.8))
+                                    .clipShape(Circle())
+                                    .shadow(color: Color.black.opacity(0.3), radius: 4, x: 0, y: 2)
+                            }
+                            .padding(.trailing, 20)
+                            .padding(.bottom, 20)
                         }
-                        .padding(.trailing, 20)
-                        .padding(.bottom, 20)
                     }
                 }
                 
@@ -204,8 +203,8 @@ struct PostListView: View {
     struct PostRow: View {
         let post: Post
         let screenWidth: CGFloat
-        let currentUserId: String?
-        @State private var isExpanded = false
+        let currentUser: AppUser?
+        @Binding var isChatRoomPresented: Bool
         
         var body: some View {
             let horizontalPadding: CGFloat = screenWidth <= 375 ? 12 : 16
@@ -300,37 +299,34 @@ struct PostListView: View {
                         }
                     }
                 }
-                
-                if currentUserId != post.userId {
-                    HStack {
-                        Spacer()
-                        // Use a button that activates a programmatic NavigationLink to prevent heavy pre-initialization
-                        NavigationLink(destination: LazyView(ChatRoomView(partnerId: post.userId, partnerName: post.userName, partnerImageUrl: post.userProfileImageUrl))) {
+
+                HStack {
+                    Spacer()
+                    NavigationLink(
+                        destination: ChatRoomView(
+                            currentUserId: currentUser?.id ?? "",
+                            chatPartnerId: post.userId,
+                            chatPartnerName: post.userName,
+                            chatPartnerImageUrl: post.userProfileImageUrl,
+                            sourcePostId: post.id ?? "",
+                            currentUser: currentUser,
+                            isChatRoomPresented: $isChatRoomPresented
+                        )
+                    ) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "envelope.fill")
                             Text("メッセージ")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 8)
-                                .background(Color(hex: "#3182F6"))
-                                .cornerRadius(16)
                         }
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(Color(hex: "#7DB4FF"))
                     }
+                    .disabled((currentUser?.id ?? "").isEmpty || currentUser?.id == post.userId)
+                    .opacity((currentUser?.id ?? "").isEmpty || currentUser?.id == post.userId ? 0.4 : 1.0)
                 }
             }
             .padding(.horizontal, horizontalPadding)
             .padding(.vertical, 16)
             .background(Color.black)
         }
-    }
-}
-
-// Wrapper to defer initialization of destination views in NavigationLink
-public struct LazyView<Content: View>: View {
-    let build: () -> Content
-    public init(_ build: @autoclosure @escaping () -> Content) {
-        self.build = build
-    }
-    public var body: Content {
-        build()
     }
 }

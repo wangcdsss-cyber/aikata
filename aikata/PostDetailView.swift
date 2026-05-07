@@ -3,7 +3,6 @@ import SwiftUI
 struct PostDetailView: View {
     let post: Post
     @Environment(\.dismiss) var dismiss
-    @EnvironmentObject var authManager: AuthManager
     
     var body: some View {
         ZStack {
@@ -67,19 +66,17 @@ struct PostDetailView: View {
                     
                     Spacer(minLength: 40)
                     
-                    if let currentUser = authManager.currentUser, post.userId != currentUser.id {
-                        // Message Button
-                        HStack {
-                            Spacer()
-                            NavigationLink(destination: LazyView(ChatRoomView(partnerId: post.userId, partnerName: post.userName, partnerImageUrl: post.userProfileImageUrl))) {
+                    // Message Button (Placeholder for Phase 2)
+                    HStack {
+                        Spacer()
+                        Button(action: {
+                            // TODO: Open chat
+                        }) {
+                            HStack {
+                                Image(systemName: "envelope.fill")
                                 Text("メッセージ")
-                                    .font(.system(size: 14, weight: .semibold))
-                                    .foregroundColor(.white)
-                                    .padding(.horizontal, 20)
-                                    .padding(.vertical, 10)
-                                    .background(Color(hex: "#3182F6"))
-                                    .cornerRadius(20)
                             }
+                            .foregroundColor(.gray)
                         }
                     }
                 }

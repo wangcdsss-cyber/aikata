@@ -13,12 +13,10 @@
 		99121BD22FAAFF4900171F8F /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 99121BD12FAAFF4900171F8F /* FirebaseFirestore */; };
 		99121BD42FAAFF4900171F8F /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = 99121BD32FAAFF4900171F8F /* FirebaseMessaging */; };
 		99121BD62FAAFF4900171F8F /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = 99121BD52FAAFF4900171F8F /* FirebaseStorage */; };
-		CHATROOMVIEW_REF /* ChatRoomView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CHATROOMVIEW_FILE_REF /* ChatRoomView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		99121B4D2FAAF48C00171F8F /* aikata.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = aikata.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		CHATROOMVIEW_FILE_REF /* ChatRoomView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatRoomView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -146,7 +144,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				CHATROOMVIEW_REF /* ChatRoomView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
