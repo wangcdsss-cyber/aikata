@@ -1,6 +1,13 @@
 import Foundation
 
 extension Date {
+    func chatTimestampString() -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "ja_JP")
+        formatter.dateFormat = "HH:mm"
+        return formatter.string(from: self)
+    }
+
     func relativeTimeString() -> String {
         let calendar = Calendar.current
         let now = Date()
@@ -20,5 +27,12 @@ extension Date {
         }
         
         return "たった今" // Less than a minute
+    }
+
+    func chatDateSeparatorString() -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "ja_JP")
+        formatter.dateFormat = "MM/dd"
+        return formatter.string(from: self)
     }
 }

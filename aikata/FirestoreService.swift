@@ -178,35 +178,98 @@ class FirestoreService: ObservableObject {
     func fetchMessages(chatRoomId: String, limit: Int = 20) async throws -> [Message] {
         let snapshot = try await db.collection("messages")
             .whereField("chatRoomId", isEqualTo: chatRoomId)
-            .order(by: "createdAt", descending: true)
-            .limit(to: limit)
+            .order(by: "createdAt", descending: false)
+            .limit(toLast: limit)
             .getDocuments()
 
         let fetchedMessages: [Message] = snapshot.documents.compactMap { document in
-            let data = document.data()
+            self.decodeMessage(document: document, fallbackChatRoomId: chatRoomId)
+        }
+        return fetchedMessages
+    }
 
-            guard
-                let senderId = data["senderId"] as? String,
-                let receiverId = data["receiverId"] as? String,
-                let text = data["text"] as? String
-            else {
-                return nil
-            }
+    func fetchOlderMessages(chatRoomId: String, before oldestDate: Date, limit: Int = 20) async throws -> [Message] {
+        let snapshot = try await db.collection("messages")
+            .whereField("chatRoomId", isEqualTo: chatRoomId)
+            .order(by: "createdAt", descending: false)
+            .end(before: [Timestamp(date: oldestDate)])
+            .limit(toLast: limit)
+            .getDocuments()
 
-            let createdAt = (data["createdAt"] as? Timestamp)?.dateValue() ?? Date()
-            let roomId = (data["chatRoomId"] as? String) ?? chatRoomId
+        let fetchedMessages: [Message] = snapshot.documents.compactMap { document in
+            self.decodeMessage(document: document, fallbackChatRoomId: chatRoomId)
+        }
+        return fetchedMessages
+    }
 
-            return Message(
-                id: document.documentID,
-                chatRoomId: roomId,
-                senderId: senderId,
-                receiverId: receiverId,
-                text: text,
-                createdAt: createdAt
-            )
+    func sendMessage(chatRoomId: String, senderId: String, receiverId: String, text: String) async throws {
+        let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedText.isEmpty else { return }
+
+        let data: [String: Any] = [
+            "chatRoomId": chatRoomId,
+            "senderId": senderId,
+            "receiverId": receiverId,
+            "text": trimmedText,
+            "createdAt": Timestamp(date: Date())
+        ]
+
+        try await db.collection("messages").document().setData(data)
+    }
+
+    func observeNewMessages(
+        chatRoomId: String,
+        after latestDate: Date?,
+        onChange: @escaping (Result<[Message], Error>) -> Void
+    ) -> ListenerRegistration {
+        var query: Query = db.collection("messages")
+            .whereField("chatRoomId", isEqualTo: chatRoomId)
+            .order(by: "createdAt", descending: false)
+
+        if let latestDate = latestDate {
+            query = query.start(after: [Timestamp(date: latestDate)])
         }
 
-        return fetchedMessages.reversed()
+        return query.addSnapshotListener { [weak self] snapshot, error in
+            if let error = error {
+                onChange(.failure(error))
+                return
+            }
+
+            guard let snapshot = snapshot, let self = self else {
+                onChange(.success([]))
+                return
+            }
+
+            let messages = snapshot.documents.compactMap { document in
+                self.decodeMessage(document: document, fallbackChatRoomId: chatRoomId)
+            }
+            onChange(.success(messages))
+        }
+    }
+
+    private func decodeMessage(document: DocumentSnapshot, fallbackChatRoomId: String) -> Message? {
+        let data = document.data() ?? [:]
+
+        guard
+            let senderId = data["senderId"] as? String,
+            let receiverId = data["receiverId"] as? String,
+            let text = data["text"] as? String
+        else {
+            return nil
+        }
+
+        let createdAt = (data["createdAt"] as? Timestamp)?.dateValue() ?? Date()
+        let roomId = (data["chatRoomId"] as? String) ?? fallbackChatRoomId
+
+        return Message(
+            id: document.documentID,
+            chatRoomId: roomId,
+            senderId: senderId,
+            receiverId: receiverId,
+            text: text,
+            createdAt: createdAt
+        )
     }
     
     // Submit a report
