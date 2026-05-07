@@ -1,6 +1,8 @@
 import SwiftUI
 import FirebaseFirestore
+import FirebaseStorage
 import UIKit
+import PhotosUI
 
 struct ChatRoomView: View {
     @Environment(\.dismiss) private var dismiss
@@ -26,6 +28,10 @@ struct ChatRoomView: View {
     @State private var listener: ListenerRegistration? = nil
     @State private var scrollTargetMessageId: String? = nil
     @FocusState private var isInputFocused: Bool
+    @State private var selectedPhotoItems: [PhotosPickerItem] = []
+    @State private var isUploadingImages = false
+    @State private var uploadStatusMessage: String? = nil
+    @State private var alertMessage: String? = nil
 
     private var chatRoomId: String {
         makeChatRoomId(userId1: currentUserId, userId2: chatPartnerId)
@@ -102,6 +108,13 @@ struct ChatRoomView: View {
                 }
             }
 
+            if isUploadingImages, let uploadStatusMessage {
+                Text(uploadStatusMessage)
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.8))
+                    .padding(.bottom, 4)
+            }
+
             chatInputBar
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -173,6 +186,20 @@ struct ChatRoomView: View {
             await loadInitialMessages()
             startRealtimeListener()
         }
+        .onChange(of: selectedPhotoItems) { items in
+            guard !items.isEmpty else { return }
+            Task {
+                await uploadSelectedPhotos(items)
+            }
+        }
+        .alert("メッセージ", isPresented: Binding(
+            get: { alertMessage != nil },
+            set: { if !$0 { alertMessage = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(alertMessage ?? "")
+        }
         .onAppear {
             isChatRoomPresented = true
         }
@@ -186,13 +213,17 @@ struct ChatRoomView: View {
 
     private var chatInputBar: some View {
         HStack(spacing: 10) {
-            Button(action: {}) {
+            PhotosPicker(
+                selection: $selectedPhotoItems,
+                maxSelectionCount: 6,
+                matching: .images
+            ) {
                 Image(systemName: "photo")
-                    .foregroundColor(.white.opacity(0.8))
+                    .foregroundColor(.white.opacity(0.85))
                     .font(.system(size: 18))
             }
-            .disabled(true)
-            .opacity(0.7)
+            .disabled(isUploadingImages || isSending)
+            .opacity((isUploadingImages || isSending) ? 0.5 : 1.0)
 
             TextField(
                 "",
@@ -371,6 +402,64 @@ struct ChatRoomView: View {
         if index == 0 { return true }
         return !Calendar.current.isDate(messages[index].createdAt, inSameDayAs: messages[index - 1].createdAt)
     }
+
+    @MainActor
+    private func uploadSelectedPhotos(_ items: [PhotosPickerItem]) async {
+        guard !isUploadingImages else { return }
+        guard !chatRoomId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            alertMessage = "チャットルーム情報が不正です。画面を閉じて再度お試しください。"
+            selectedPhotoItems = []
+            return
+        }
+        guard !currentUserId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            alertMessage = "ユーザー情報が未取得のため送信できません。再ログインしてください。"
+            selectedPhotoItems = []
+            return
+        }
+        isUploadingImages = true
+        isInputFocused = false
+        uploadStatusMessage = "画像を準備中..."
+        defer {
+            isUploadingImages = false
+            selectedPhotoItems = []
+            uploadStatusMessage = nil
+        }
+
+        var uiImages: [UIImage] = []
+        uiImages.reserveCapacity(items.count)
+
+        for item in items {
+            do {
+                guard let data = try await item.loadTransferable(type: Data.self), let image = UIImage(data: data) else {
+                    continue
+                }
+                uiImages.append(image)
+            } catch {
+                alertMessage = "画像の読み込みに失敗しました。再度お試しください。"
+                return
+            }
+        }
+
+        guard !uiImages.isEmpty else {
+            alertMessage = "有効な画像を選択できませんでした。"
+            return
+        }
+
+        do {
+            uploadStatusMessage = "画像を送信中..."
+            try await firestoreService.sendImageMessage(
+                chatRoomId: chatRoomId,
+                senderId: currentUserId,
+                receiverId: chatPartnerId,
+                images: uiImages
+            )
+            let generator = UIImpactFeedbackGenerator(style: .light)
+            generator.prepare()
+            generator.impactOccurred()
+        } catch {
+            alertMessage = "画像送信に失敗しました: \(error.localizedDescription)"
+        }
+    }
 }
 
 private struct ChatDateSeparator: View {
@@ -405,14 +494,7 @@ private struct MessageBubble: View {
                     .foregroundColor(Color.white.opacity(0.7))
                     .padding(.bottom, 2)
 
-                Text(message.text)
-                    .font(.system(size: 17, weight: .medium))
-                    .foregroundColor(.white)
-                    .multilineTextAlignment(.leading)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(Color.blue)
-                    .cornerRadius(12)
+                MessageContent(message: message, isCurrentUser: isCurrentUser)
             } else {
                 AsyncImage(url: URL(string: chatPartnerImageUrl ?? "")) { image in
                     image
@@ -426,14 +508,7 @@ private struct MessageBubble: View {
                 .frame(width: 26, height: 26)
                 .clipShape(Circle())
 
-                Text(message.text)
-                    .font(.system(size: 17, weight: .medium))
-                    .foregroundColor(.white)
-                    .multilineTextAlignment(.leading)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(Color.gray.opacity(0.4))
-                    .cornerRadius(12)
+                MessageContent(message: message, isCurrentUser: isCurrentUser)
 
                 Text(message.createdAt.chatTimestampString())
                     .font(.system(size: 12))
@@ -444,5 +519,231 @@ private struct MessageBubble: View {
             }
         }
         .frame(maxWidth: .infinity)
+    }
+}
+
+private struct MessageContent: View {
+    let message: Message
+    let isCurrentUser: Bool
+
+    var body: some View {
+        Group {
+            if message.type == .image, let imageUrls = message.imageUrls, !imageUrls.isEmpty {
+                ChatImageGrid(imageUrls: imageUrls)
+            } else {
+                Text(message.text)
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundColor(.white)
+                    .multilineTextAlignment(.leading)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(isCurrentUser ? Color.blue : Color.gray.opacity(0.4))
+                    .cornerRadius(12)
+            }
+        }
+    }
+}
+
+private struct ChatImageGrid: View {
+    let imageUrls: [String]
+
+    var body: some View {
+        let columns = imageUrls.count == 1
+            ? [GridItem(.flexible())]
+            : [GridItem(.flexible()), GridItem(.flexible())]
+
+        LazyVGrid(columns: columns, spacing: 6) {
+            ForEach(imageUrls, id: \.self) { url in
+                RemoteChatImageView(urlString: url)
+            }
+        }
+        .frame(maxWidth: 220)
+    }
+}
+
+private final class ChatImageMemoryCache {
+    static let shared = ChatImageMemoryCache()
+    private let cache = NSCache<NSString, UIImage>()
+
+    private init() {
+        cache.countLimit = 200
+    }
+
+    func image(forKey key: String) -> UIImage? {
+        cache.object(forKey: key as NSString)
+    }
+
+    func set(_ image: UIImage, forKey key: String) {
+        cache.setObject(image, forKey: key as NSString)
+    }
+}
+
+private struct RemoteChatImageView: View {
+    let urlString: String
+    @State private var image: UIImage? = nil
+    @State private var isLoading = false
+    @State private var loadError: Error? = nil
+    @State private var showingPreview = false
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 10)
+                .fill(Color.white.opacity(0.08))
+
+            if let image {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .onTapGesture {
+                        showingPreview = true
+                    }
+            } else if isLoading {
+                ProgressView()
+                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+            } else {
+                VStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .foregroundColor(.white.opacity(0.8))
+                    Button("再試行") {
+                        Task {
+                            await loadImage(force: true)
+                        }
+                    }
+                    .font(.caption)
+                    .foregroundColor(.white)
+                }
+            }
+        }
+        .frame(width: 102, height: 132)
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .onAppear {
+            guard image == nil && !isLoading else { return }
+            Task {
+                await loadImage(force: false)
+            }
+        }
+        .fullScreenCover(isPresented: $showingPreview) {
+            if let image {
+                ChatImagePreviewView(image: image)
+            }
+        }
+    }
+
+    @MainActor
+    private func loadImage(force: Bool) async {
+        if urlString.hasPrefix("storage://") {
+            await loadImageFromStoragePath(force: force)
+            return
+        }
+
+        guard let url = URL(string: urlString) else { return }
+        if !force, let cached = ChatImageMemoryCache.shared.image(forKey: urlString) {
+            image = cached
+            loadError = nil
+            return
+        }
+
+        isLoading = true
+        defer { isLoading = false }
+
+        do {
+            let request = URLRequest(
+                url: url,
+                cachePolicy: .returnCacheDataElseLoad,
+                timeoutInterval: 20
+            )
+            let (data, _) = try await URLSession.shared.data(for: request)
+            guard let loadedImage = UIImage(data: data) else {
+                throw NSError(domain: "ChatImage", code: 1003, userInfo: [NSLocalizedDescriptionKey: "画像データが不正です。"])
+            }
+            image = loadedImage
+            ChatImageMemoryCache.shared.set(loadedImage, forKey: urlString)
+            loadError = nil
+        } catch {
+            loadError = error
+        }
+    }
+
+    @MainActor
+    private func loadImageFromStoragePath(force: Bool) async {
+        let path = urlString.replacingOccurrences(of: "storage://", with: "")
+        guard !path.isEmpty else { return }
+        if !force, let cached = ChatImageMemoryCache.shared.image(forKey: urlString) {
+            image = cached
+            loadError = nil
+            return
+        }
+
+        isLoading = true
+        defer { isLoading = false }
+
+        var lastError: Error?
+        for attempt in 0...2 {
+            do {
+                let ref = Storage.storage().reference().child(path)
+                let data = try await ref.data(maxSize: 10 * 1024 * 1024)
+                guard let loadedImage = UIImage(data: data) else {
+                    throw NSError(domain: "ChatImage", code: 1003, userInfo: [NSLocalizedDescriptionKey: "画像データが不正です。"])
+                }
+                image = loadedImage
+                ChatImageMemoryCache.shared.set(loadedImage, forKey: urlString)
+                loadError = nil
+                return
+            } catch {
+                lastError = error
+                if attempt < 2 {
+                    try? await Task.sleep(nanoseconds: UInt64((attempt + 1) * 300_000_000))
+                }
+            }
+        }
+        loadError = lastError
+    }
+}
+
+private struct ChatImagePreviewView: View {
+    @Environment(\.dismiss) private var dismiss
+    let image: UIImage
+    @State private var scale: CGFloat = 1
+    @State private var lastScale: CGFloat = 1
+
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            Color.black.ignoresSafeArea()
+
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFit()
+                .scaleEffect(scale)
+                .gesture(
+                    MagnificationGesture()
+                        .onChanged { value in
+                            let newScale = lastScale * value
+                            scale = min(max(newScale, 1), 4)
+                        }
+                        .onEnded { _ in
+                            lastScale = scale
+                        }
+                )
+                .onTapGesture(count: 2) {
+                    if scale > 1 {
+                        scale = 1
+                        lastScale = 1
+                    } else {
+                        scale = 2
+                        lastScale = 2
+                    }
+                }
+
+            Button(action: { dismiss() }) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundColor(.white)
+                    .padding(12)
+                    .background(Color.black.opacity(0.55))
+                    .clipShape(Circle())
+            }
+            .padding(.top, 16)
+            .padding(.leading, 16)
+        }
     }
 }

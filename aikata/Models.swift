@@ -1,5 +1,6 @@
 import Foundation
 import FirebaseFirestore
+import UIKit
 
 enum Gender: String, Codable, CaseIterable {
     case male = "男性"
@@ -65,9 +66,54 @@ struct Message: Codable, Identifiable {
     var senderId: String
     var receiverId: String
     var text: String
+    var messageType: String = MessageType.text.rawValue
+    var imageUrls: [String]? = nil
     var createdAt: Date
+
+    var type: MessageType {
+        MessageType(rawValue: messageType) ?? .text
+    }
+}
+
+enum MessageType: String, Codable {
+    case text
+    case image
 }
 
 func makeChatRoomId(userId1: String, userId2: String) -> String {
     [userId1, userId2].sorted().joined(separator: "_")
+}
+
+enum ChatImageCompressor {
+    static func compressForUpload(
+        _ image: UIImage,
+        maxDimension: CGFloat = 1080,
+        maxBytes: Int = 2 * 1024 * 1024
+    ) -> Data? {
+        let resized = resize(image, maxDimension: maxDimension)
+        var quality: CGFloat = 0.9
+        var data = resized.jpegData(compressionQuality: quality)
+
+        while let currentData = data, currentData.count > maxBytes, quality > 0.1 {
+            quality -= 0.1
+            data = resized.jpegData(compressionQuality: quality)
+        }
+        return data
+    }
+
+    private static func resize(_ image: UIImage, maxDimension: CGFloat) -> UIImage {
+        let size = image.size
+        let maxCurrentDimension = max(size.width, size.height)
+        guard maxCurrentDimension > maxDimension else { return image }
+
+        let scale = maxDimension / maxCurrentDimension
+        let newSize = CGSize(width: size.width * scale, height: size.height * scale)
+        let format = UIGraphicsImageRendererFormat.default()
+        format.scale = 1
+
+        let renderer = UIGraphicsImageRenderer(size: newSize, format: format)
+        return renderer.image { _ in
+            image.draw(in: CGRect(origin: .zero, size: newSize))
+        }
+    }
 }

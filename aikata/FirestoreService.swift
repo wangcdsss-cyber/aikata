@@ -1,9 +1,12 @@
 import Foundation
 import FirebaseFirestore
+import FirebaseStorage
 import Combine
+import UIKit
 
 class FirestoreService: ObservableObject {
     private let db = Firestore.firestore()
+    private let storage = Storage.storage()
     
     @Published var posts: [Post] = []
     @Published var isFetching = false
@@ -211,6 +214,51 @@ class FirestoreService: ObservableObject {
             "senderId": senderId,
             "receiverId": receiverId,
             "text": trimmedText,
+            "messageType": MessageType.text.rawValue,
+            "createdAt": Timestamp(date: Date())
+        ]
+
+        try await db.collection("messages").document().setData(data)
+    }
+
+    func sendImageMessage(
+        chatRoomId: String,
+        senderId: String,
+        receiverId: String,
+        images: [UIImage]
+    ) async throws {
+        guard !images.isEmpty else { return }
+        guard !chatRoomId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw NSError(domain: "ChatImage", code: 1004, userInfo: [NSLocalizedDescriptionKey: "チャットルームIDが無効です。"])
+        }
+        guard !senderId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw NSError(domain: "ChatImage", code: 1005, userInfo: [NSLocalizedDescriptionKey: "送信者IDが無効です。"])
+        }
+        guard !receiverId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw NSError(domain: "ChatImage", code: 1006, userInfo: [NSLocalizedDescriptionKey: "受信者IDが無効です。"])
+        }
+
+        var uploadedUrls: [String] = []
+        uploadedUrls.reserveCapacity(images.count)
+
+        for image in images {
+            guard let data = ChatImageCompressor.compressForUpload(image) else {
+                throw NSError(domain: "ChatImage", code: 1001, userInfo: [NSLocalizedDescriptionKey: "画像の圧縮に失敗しました。"])
+            }
+
+            let fileName = "\(UUID().uuidString).jpg"
+            let path = "chat_images/\(chatRoomId)/\(fileName)"
+            let url = try await uploadImageDataWithRetry(data: data, path: path, retryCount: 2)
+            uploadedUrls.append(url)
+        }
+
+        let data: [String: Any] = [
+            "chatRoomId": chatRoomId,
+            "senderId": senderId,
+            "receiverId": receiverId,
+            "text": "",
+            "messageType": MessageType.image.rawValue,
+            "imageUrls": uploadedUrls,
             "createdAt": Timestamp(date: Date())
         ]
 
@@ -253,14 +301,16 @@ class FirestoreService: ObservableObject {
 
         guard
             let senderId = data["senderId"] as? String,
-            let receiverId = data["receiverId"] as? String,
-            let text = data["text"] as? String
+            let receiverId = data["receiverId"] as? String
         else {
             return nil
         }
 
         let createdAt = (data["createdAt"] as? Timestamp)?.dateValue() ?? Date()
         let roomId = (data["chatRoomId"] as? String) ?? fallbackChatRoomId
+        let text = (data["text"] as? String) ?? ""
+        let messageType = (data["messageType"] as? String) ?? MessageType.text.rawValue
+        let imageUrls = data["imageUrls"] as? [String]
 
         return Message(
             id: document.documentID,
@@ -268,8 +318,53 @@ class FirestoreService: ObservableObject {
             senderId: senderId,
             receiverId: receiverId,
             text: text,
+            messageType: messageType,
+            imageUrls: imageUrls,
             createdAt: createdAt
         )
+    }
+
+    private func uploadImageDataWithRetry(data: Data, path: String, retryCount: Int) async throws -> String {
+        var lastError: Error?
+        for attempt in 0...retryCount {
+            do {
+                let ref = storage.reference().child(path)
+                let metadata = StorageMetadata()
+                metadata.contentType = "image/jpeg"
+                _ = try await ref.putDataAsync(data, metadata: metadata)
+                do {
+                    let downloadURL = try await downloadURLWithRetry(ref: ref, retryCount: 3)
+                    return downloadURL.absoluteString
+                } catch {
+                    // Fallback: keep sending message with storage path even if download URL cannot be issued immediately.
+                    return "storage://\(path)"
+                }
+            } catch {
+                lastError = error
+                if attempt < retryCount {
+                    try? await Task.sleep(nanoseconds: UInt64((attempt + 1) * 400_000_000))
+                }
+            }
+        }
+        if let nsError = lastError as NSError?, nsError.domain == StorageErrorDomain {
+            throw NSError(domain: "ChatImage", code: 1102, userInfo: [NSLocalizedDescriptionKey: "画像アップロードに失敗しました。Firebase Storage Rulesとバケット設定を確認してください。"])
+        }
+        throw lastError ?? NSError(domain: "ChatImage", code: 1002, userInfo: [NSLocalizedDescriptionKey: "画像アップロードに失敗しました。"])
+    }
+
+    private func downloadURLWithRetry(ref: StorageReference, retryCount: Int) async throws -> URL {
+        var lastError: Error?
+        for attempt in 0...retryCount {
+            do {
+                return try await ref.downloadURL()
+            } catch {
+                lastError = error
+                if attempt < retryCount {
+                    try? await Task.sleep(nanoseconds: UInt64((attempt + 1) * 300_000_000))
+                }
+            }
+        }
+        throw lastError ?? NSError(domain: "ChatImage", code: 1007, userInfo: [NSLocalizedDescriptionKey: "ダウンロードURLの取得に失敗しました。"])
     }
     
     // Submit a report
