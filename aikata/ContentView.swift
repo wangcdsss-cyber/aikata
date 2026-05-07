@@ -15,7 +15,7 @@ struct ContentView: View {
             if authManager.isLoading {
                 ProgressView()
             } else if authManager.currentUser != nil {
-                PostListView()
+                MainHomeView()
             } else {
                 OnboardingView()
             }

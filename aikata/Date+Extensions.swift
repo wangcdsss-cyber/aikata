@@ -35,4 +35,11 @@ extension Date {
         formatter.dateFormat = "MM/dd"
         return formatter.string(from: self)
     }
+
+    func chatRoomListDateString() -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "ja_JP")
+        formatter.dateFormat = "yyyy年MM月dd日"
+        return formatter.string(from: self)
+    }
 }

@@ -32,6 +32,7 @@ struct ChatRoomView: View {
     @State private var isUploadingImages = false
     @State private var uploadStatusMessage: String? = nil
     @State private var alertMessage: String? = nil
+    @State private var didInitialScrollToBottom = false
 
     private var chatRoomId: String {
         makeChatRoomId(userId1: currentUserId, userId2: chatPartnerId)
@@ -82,16 +83,21 @@ struct ChatRoomView: View {
                                 )
                                 .id(messageScrollId(message))
                                 .onAppear {
-                                    if index == 0 {
+                                    if index == 0 && didInitialScrollToBottom {
                                         Task {
                                             await loadOlderMessagesIfNeeded()
                                         }
                                     }
                                 }
                             }
+
+                            Color.clear
+                                .frame(height: 1)
+                                .id("chat-bottom-anchor")
                         }
                         .padding(.horizontal, 12)
                         .padding(.vertical, 16)
+                        .padding(.bottom, 120)
                     }
                     .contentShape(Rectangle())
                     .onTapGesture {
@@ -103,6 +109,20 @@ struct ChatRoomView: View {
                             withAnimation(.easeOut(duration: 0.2)) {
                                 proxy.scrollTo(targetId, anchor: .bottom)
                             }
+                        }
+                    }
+                    .onAppear {
+                        // Double-scroll after layout settles so newest message is always visible.
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                            withAnimation(.easeOut(duration: 0.18)) {
+                                proxy.scrollTo("chat-bottom-anchor", anchor: .bottom)
+                            }
+                        }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                            withAnimation(.easeOut(duration: 0.18)) {
+                                proxy.scrollTo("chat-bottom-anchor", anchor: .bottom)
+                            }
+                            didInitialScrollToBottom = true
                         }
                     }
                 }
@@ -282,9 +302,7 @@ struct ChatRoomView: View {
         do {
             messages = try await firestoreService.fetchMessages(chatRoomId: chatRoomId, limit: 20)
             hasMoreOlder = messages.count == 20
-            if let last = messages.last {
-                scrollTargetMessageId = messageScrollId(last)
-            }
+            scrollTargetMessageId = "chat-bottom-anchor"
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -324,7 +342,11 @@ struct ChatRoomView: View {
                 chatRoomId: chatRoomId,
                 senderId: currentUserId,
                 receiverId: chatPartnerId,
-                text: textToSend
+                text: textToSend,
+                senderName: currentUser?.name,
+                senderImageUrl: currentUser?.profileImageUrl,
+                receiverName: chatPartnerName,
+                receiverImageUrl: chatPartnerImageUrl
             )
             let generator = UIImpactFeedbackGenerator(style: .light)
             generator.prepare()
@@ -378,8 +400,8 @@ struct ChatRoomView: View {
         existing.sort { $0.createdAt < $1.createdAt }
         messages = existing
 
-        if scrollToBottom, let last = messages.last {
-            scrollTargetMessageId = messageScrollId(last)
+        if scrollToBottom {
+            scrollTargetMessageId = "chat-bottom-anchor"
         }
     }
 
@@ -451,7 +473,11 @@ struct ChatRoomView: View {
                 chatRoomId: chatRoomId,
                 senderId: currentUserId,
                 receiverId: chatPartnerId,
-                images: uiImages
+                images: uiImages,
+                senderName: currentUser?.name,
+                senderImageUrl: currentUser?.profileImageUrl,
+                receiverName: chatPartnerName,
+                receiverImageUrl: chatPartnerImageUrl
             )
             let generator = UIImpactFeedbackGenerator(style: .light)
             generator.prepare()
@@ -531,16 +557,40 @@ private struct MessageContent: View {
             if message.type == .image, let imageUrls = message.imageUrls, !imageUrls.isEmpty {
                 ChatImageGrid(imageUrls: imageUrls)
             } else {
-                Text(message.text)
-                    .font(.system(size: 17, weight: .medium))
-                    .foregroundColor(.white)
+                Text(makeLinkAttributedString(from: message.text))
                     .multilineTextAlignment(.leading)
+                    .tint(Color.white.opacity(0.9))
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
                     .background(isCurrentUser ? Color.blue : Color.gray.opacity(0.4))
                     .cornerRadius(12)
             }
         }
+    }
+
+    private func makeLinkAttributedString(from text: String) -> AttributedString {
+        var attributed = AttributedString(text)
+        attributed.font = .system(size: 17, weight: .medium)
+        attributed.foregroundColor = .white
+
+        guard let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue) else {
+            return attributed
+        }
+
+        let nsText = text as NSString
+        let matches = detector.matches(in: text, options: [], range: NSRange(location: 0, length: nsText.length))
+
+        for match in matches {
+            guard
+                let url = match.url,
+                let range = Range(match.range, in: attributed)
+            else { continue }
+
+            attributed[range].link = url
+            attributed[range].underlineStyle = .single
+        }
+
+        return attributed
     }
 }
 

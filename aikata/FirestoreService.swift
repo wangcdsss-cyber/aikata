@@ -4,6 +4,12 @@ import FirebaseStorage
 import Combine
 import UIKit
 
+struct ChatRoomPage {
+    var rooms: [ChatRoomSummary]
+    var lastDocument: DocumentSnapshot?
+    var hasMore: Bool
+}
+
 class FirestoreService: ObservableObject {
     private let db = Firestore.firestore()
     private let storage = Storage.storage()
@@ -205,7 +211,16 @@ class FirestoreService: ObservableObject {
         return fetchedMessages
     }
 
-    func sendMessage(chatRoomId: String, senderId: String, receiverId: String, text: String) async throws {
+    func sendMessage(
+        chatRoomId: String,
+        senderId: String,
+        receiverId: String,
+        text: String,
+        senderName: String? = nil,
+        senderImageUrl: String? = nil,
+        receiverName: String? = nil,
+        receiverImageUrl: String? = nil
+    ) async throws {
         let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedText.isEmpty else { return }
 
@@ -219,13 +234,28 @@ class FirestoreService: ObservableObject {
         ]
 
         try await db.collection("messages").document().setData(data)
+        try await upsertChatRoomMetadata(
+            chatRoomId: chatRoomId,
+            senderId: senderId,
+            receiverId: receiverId,
+            senderName: senderName,
+            senderImageUrl: senderImageUrl,
+            receiverName: receiverName,
+            receiverImageUrl: receiverImageUrl,
+            lastMessageText: trimmedText,
+            lastMessageType: MessageType.text.rawValue
+        )
     }
 
     func sendImageMessage(
         chatRoomId: String,
         senderId: String,
         receiverId: String,
-        images: [UIImage]
+        images: [UIImage],
+        senderName: String? = nil,
+        senderImageUrl: String? = nil,
+        receiverName: String? = nil,
+        receiverImageUrl: String? = nil
     ) async throws {
         guard !images.isEmpty else { return }
         guard !chatRoomId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
@@ -263,6 +293,68 @@ class FirestoreService: ObservableObject {
         ]
 
         try await db.collection("messages").document().setData(data)
+        try await upsertChatRoomMetadata(
+            chatRoomId: chatRoomId,
+            senderId: senderId,
+            receiverId: receiverId,
+            senderName: senderName,
+            senderImageUrl: senderImageUrl,
+            receiverName: receiverName,
+            receiverImageUrl: receiverImageUrl,
+            lastMessageText: "",
+            lastMessageType: MessageType.image.rawValue
+        )
+    }
+
+    func fetchChatRooms(userId: String, limit: Int = 20) async throws -> ChatRoomPage {
+        let snapshot = try await db.collection("chatRooms")
+            .whereField("members", arrayContains: userId)
+            .order(by: "lastMessageAt", descending: true)
+            .limit(to: limit)
+            .getDocuments()
+
+        let rooms = snapshot.documents.compactMap { decodeChatRoom(document: $0) }
+        return ChatRoomPage(
+            rooms: rooms,
+            lastDocument: snapshot.documents.last,
+            hasMore: snapshot.documents.count == limit
+        )
+    }
+
+    func fetchMoreChatRooms(userId: String, lastDocument: DocumentSnapshot, limit: Int = 20) async throws -> ChatRoomPage {
+        let snapshot = try await db.collection("chatRooms")
+            .whereField("members", arrayContains: userId)
+            .order(by: "lastMessageAt", descending: true)
+            .start(afterDocument: lastDocument)
+            .limit(to: limit)
+            .getDocuments()
+
+        let rooms = snapshot.documents.compactMap { decodeChatRoom(document: $0) }
+        return ChatRoomPage(
+            rooms: rooms,
+            lastDocument: snapshot.documents.last,
+            hasMore: snapshot.documents.count == limit
+        )
+    }
+
+    func deleteChatRoom(chatRoomId: String) async throws {
+        let messagesRef = db.collection("messages")
+        while true {
+            let snapshot = try await messagesRef
+                .whereField("chatRoomId", isEqualTo: chatRoomId)
+                .limit(to: 200)
+                .getDocuments()
+
+            if snapshot.documents.isEmpty {
+                break
+            }
+
+            let batch = db.batch()
+            snapshot.documents.forEach { batch.deleteDocument($0.reference) }
+            try await batch.commit()
+        }
+
+        try await db.collection("chatRooms").document(chatRoomId).delete()
     }
 
     func observeNewMessages(
@@ -322,6 +414,56 @@ class FirestoreService: ObservableObject {
             imageUrls: imageUrls,
             createdAt: createdAt
         )
+    }
+
+    private func decodeChatRoom(document: DocumentSnapshot) -> ChatRoomSummary? {
+        let data = document.data() ?? [:]
+        guard
+            let members = data["members"] as? [String],
+            let lastMessageAt = (data["lastMessageAt"] as? Timestamp)?.dateValue()
+        else {
+            return nil
+        }
+
+        return ChatRoomSummary(
+            id: document.documentID,
+            members: members,
+            memberNames: data["memberNames"] as? [String: String] ?? [:],
+            memberImageUrls: data["memberImageUrls"] as? [String: String] ?? [:],
+            lastMessageText: (data["lastMessageText"] as? String) ?? "",
+            lastMessageType: (data["lastMessageType"] as? String) ?? MessageType.text.rawValue,
+            lastMessageAt: lastMessageAt
+        )
+    }
+
+    private func upsertChatRoomMetadata(
+        chatRoomId: String,
+        senderId: String,
+        receiverId: String,
+        senderName: String?,
+        senderImageUrl: String?,
+        receiverName: String?,
+        receiverImageUrl: String?,
+        lastMessageText: String,
+        lastMessageType: String
+    ) async throws {
+        var memberNames: [String: String] = [:]
+        var memberImageUrls: [String: String] = [:]
+        if let senderName { memberNames[senderId] = senderName }
+        if let receiverName { memberNames[receiverId] = receiverName }
+        if let senderImageUrl { memberImageUrls[senderId] = senderImageUrl }
+        if let receiverImageUrl { memberImageUrls[receiverId] = receiverImageUrl }
+
+        let data: [String: Any] = [
+            "members": [senderId, receiverId],
+            "memberNames": memberNames,
+            "memberImageUrls": memberImageUrls,
+            "lastMessageText": lastMessageText,
+            "lastMessageType": lastMessageType,
+            "lastMessageAt": Timestamp(date: Date()),
+            "updatedAt": Timestamp(date: Date())
+        ]
+        try await db.collection("chatRooms").document(chatRoomId).setData(data, merge: true)
     }
 
     private func uploadImageDataWithRetry(data: Data, path: String, retryCount: Int) async throws -> String {
