@@ -231,14 +231,18 @@ private struct ChatRoomRow: View {
                     .font(.system(size: 11))
                     .foregroundColor(Color(hex: "#9E9E9E"))
 
-                Button("削除", role: .destructive, action: onDeleteTapped)
-                    .font(.system(size: 11, weight: .semibold))
-
-                Button("報告", action: onReportTapped)
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(.orange)
+                Menu {
+                    Button("報告", action: onReportTapped)
+                    Button("削除", role: .destructive, action: onDeleteTapped)
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.white)
+                        .frame(width: 24, height: 24)
+                        .contentShape(Rectangle())
+                }
             }
-            .frame(width: 170, alignment: .trailing)
+            .frame(width: 135, alignment: .trailing)
         }
         .frame(height: 72)
         .padding(.horizontal, 12)
