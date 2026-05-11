@@ -89,6 +89,35 @@ enum MessageType: String, Codable {
     case image
 }
 
+struct ChatRoomSummary: Identifiable, Equatable {
+    var id: String
+    var members: [String]
+    var memberNames: [String: String]
+    var memberImageUrls: [String: String]
+    var lastMessageText: String
+    var lastMessageType: String
+    var lastMessageAt: Date
+
+    func partnerId(currentUserId: String) -> String {
+        members.first(where: { $0 != currentUserId }) ?? ""
+    }
+
+    func partnerName(currentUserId: String) -> String {
+        memberNames[partnerId(currentUserId: currentUserId)] ?? "Unknown"
+    }
+
+    func partnerImageUrl(currentUserId: String) -> String? {
+        memberImageUrls[partnerId(currentUserId: currentUserId)]
+    }
+
+    var previewText: String {
+        if lastMessageType == MessageType.image.rawValue {
+            return "画像"
+        }
+        return lastMessageText.isEmpty ? "メッセージ" : lastMessageText
+    }
+}
+
 func makeChatRoomId(userId1: String, userId2: String) -> String {
     [userId1, userId2].sorted().joined(separator: "_")
 }
