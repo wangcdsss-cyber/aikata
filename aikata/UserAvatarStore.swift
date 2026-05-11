@@ -1,5 +1,6 @@
 import Foundation
 import FirebaseFirestore
+import Combine
 
 final class UserAvatarStore: ObservableObject {
     @Published private(set) var profileImageUrlByUserId: [String: String] = [:]
@@ -34,4 +35,3 @@ final class UserAvatarStore: ObservableObject {
         }
     }
 }
-
