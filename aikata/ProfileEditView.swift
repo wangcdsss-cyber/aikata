@@ -21,7 +21,7 @@ struct ProfileEditView: View {
     @State private var bodyType: String
     @State private var annualIncome: String
     @State private var birthplace: String
-    @State private var frequentDrinkingArea: String
+    @State private var frequentDrinkingAreas: [String]
 
     @State private var showImagePickerPopup = false
     @State private var showSystemPhotoPicker = false
@@ -50,7 +50,7 @@ struct ProfileEditView: View {
         _bodyType = State(initialValue: user.bodyType ?? "")
         _annualIncome = State(initialValue: user.annualIncome ?? "")
         _birthplace = State(initialValue: user.birthplace ?? "")
-        _frequentDrinkingArea = State(initialValue: user.frequentDrinkingArea ?? "")
+        _frequentDrinkingAreas = State(initialValue: Self.parseDrinkingAreas(from: user.frequentDrinkingArea ?? ""))
     }
 
     var body: some View {
@@ -166,10 +166,11 @@ struct ProfileEditView: View {
             )
         }
         .sheet(isPresented: $showFrequentDrinkingAreaSheet) {
-            SelectionSheetView(
+            DrinkingAreaSelectionSheetView(
                 title: "よく飲む地域",
-                options: Self.drinkingAreaOptions,
-                selectedValue: $frequentDrinkingArea
+                groupedOptions: Self.drinkingAreaGroupedOptions,
+                selectedValues: $frequentDrinkingAreas,
+                maxSelection: Self.drinkingAreaMaxSelection
             )
         }
         .alert("エラー", isPresented: $showErrorAlert) {
@@ -287,7 +288,7 @@ struct ProfileEditView: View {
             pickerRow(title: "最終学歴", value: education.isEmpty ? "選択してください" : education) {
                 showEducationSheet = true
             }
-            labeledTextField(title: "身長", text: $height, placeholder: "例: 175cm")
+            heightTextField(title: "身長", text: $height, placeholder: "例: 175")
             pickerRow(title: "体型", value: bodyType.isEmpty ? "選択してください" : bodyType) {
                 showBodyTypeSheet = true
             }
@@ -297,7 +298,7 @@ struct ProfileEditView: View {
             pickerRow(title: "出身地", value: birthplace.isEmpty ? "選択してください" : birthplace) {
                 showBirthplaceSheet = true
             }
-            pickerRow(title: "よく飲む地域", value: frequentDrinkingArea.isEmpty ? "選択してください" : frequentDrinkingArea) {
+            pickerRow(title: "よく飲む地域", value: frequentDrinkingAreaDisplayText.isEmpty ? "選択してください" : frequentDrinkingAreaDisplayText) {
                 showFrequentDrinkingAreaSheet = true
             }
         }
@@ -308,12 +309,41 @@ struct ProfileEditView: View {
             Text(title)
                 .foregroundColor(Color.white.opacity(0.9))
                 .font(.system(size: 14, weight: .medium))
-            TextField(placeholder, text: text)
+            TextField(
+                "",
+                text: text,
+                prompt: Text(placeholder).foregroundColor(Color.white.opacity(0.7))
+            )
                 .padding(.horizontal, 12)
                 .padding(.vertical, 10)
                 .background(Color.white.opacity(0.05))
                 .foregroundColor(.white)
                 .cornerRadius(10)
+        }
+    }
+
+    private func heightTextField(title: String, text: Binding<String>, placeholder: String = "例: 175") -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .foregroundColor(Color.white.opacity(0.9))
+                .font(.system(size: 14, weight: .medium))
+            HStack(spacing: 8) {
+                TextField(
+                    "",
+                    text: text,
+                    prompt: Text(placeholder).foregroundColor(Color.white.opacity(0.7))
+                )
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(Color.white.opacity(0.05))
+                .foregroundColor(.white)
+                .cornerRadius(10)
+                .keyboardType(.numberPad)
+
+                Text("cm")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(Color.white.opacity(0.9))
+            }
         }
     }
 
@@ -327,7 +357,7 @@ struct ProfileEditView: View {
                 Text(value)
                     .font(.system(size: 15))
                     .foregroundColor(Color.white.opacity(0.8))
-                    .lineLimit(1)
+                    .lineLimit(2)
                 Image(systemName: "chevron.right")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(Color.white.opacity(0.7))
@@ -353,7 +383,7 @@ struct ProfileEditView: View {
         normalize(bodyType) != normalize(user.bodyType ?? "") ||
         normalize(annualIncome) != normalize(user.annualIncome ?? "") ||
         normalize(birthplace) != normalize(user.birthplace ?? "") ||
-        normalize(frequentDrinkingArea) != normalize(user.frequentDrinkingArea ?? "")
+        normalize(frequentDrinkingAreaStoredValue) != normalize(user.frequentDrinkingArea ?? "")
     }
 
     private func normalize(_ value: String) -> String {
@@ -402,8 +432,19 @@ struct ProfileEditView: View {
             showErrorAlert = true
             return
         }
-        if !frequentDrinkingArea.isEmpty && !Self.drinkingAreaOptions.contains(frequentDrinkingArea) {
+        if frequentDrinkingAreas.count > Self.drinkingAreaMaxSelection {
+            errorMessage = "よく飲む地域は最大\(Self.drinkingAreaMaxSelection)件まで選択できます。"
+            showErrorAlert = true
+            return
+        }
+        let invalidDrinkingAreas = frequentDrinkingAreas.filter { !Self.drinkingAreaOptions.contains($0) }
+        if !invalidDrinkingAreas.isEmpty {
             errorMessage = "よく飲む地域の値が無効です。"
+            showErrorAlert = true
+            return
+        }
+        if frequentDrinkingAreas.contains("非公開"), frequentDrinkingAreas.count > 1 {
+            errorMessage = "「非公開」を選ぶ場合は他の地域を選択できません。"
             showErrorAlert = true
             return
         }
@@ -429,7 +470,7 @@ struct ProfileEditView: View {
                 bodyType: bodyType,
                 annualIncome: annualIncome,
                 birthplace: birthplace,
-                frequentDrinkingArea: frequentDrinkingArea
+                frequentDrinkingArea: frequentDrinkingAreaStoredValue
             )
 
             var updated = user
@@ -443,7 +484,7 @@ struct ProfileEditView: View {
             updated.bodyType = normalize(bodyType)
             updated.annualIncome = normalize(annualIncome)
             updated.birthplace = normalize(birthplace)
-            updated.frequentDrinkingArea = normalize(frequentDrinkingArea)
+            updated.frequentDrinkingArea = normalize(frequentDrinkingAreaStoredValue)
 
             authManager.updateCurrentUser(updated)
             dismiss()
@@ -633,37 +674,77 @@ struct ProfileEditView: View {
     ]
 
     private static let birthplaceOptions: [String] = prefectures + ["海外", "その他"]
+    private static let drinkingAreaSeparator = " / "
+    private static let drinkingAreaMaxSelection = 3
 
-    private static let drinkingAreaOptions: [String] = [
-        "非公開",
-        "新宿",
-        "渋谷",
-        "恵比寿",
-        "六本木",
-        "銀座",
-        "池袋",
-        "上野",
-        "赤坂",
-        "東京駅・丸の内",
-        "横浜",
-        "川崎",
-        "大宮",
-        "千葉",
-        "名古屋",
-        "栄",
-        "梅田",
-        "難波",
-        "天王寺",
-        "京都駅周辺",
-        "三宮",
-        "博多",
-        "天神",
-        "すすきの",
-        "仙台",
-        "広島",
-        "那覇",
-        "その他"
+    private static let drinkingAreaGroupedOptions: [(region: String, areas: [String])] = [
+        ("公開設定", ["非公開"]),
+        ("関東", [
+            "新宿", "渋谷", "恵比寿", "六本木", "銀座", "池袋", "上野", "赤坂",
+            "東京駅・丸の内", "有楽町", "神田", "秋葉原", "御茶ノ水", "神楽坂", "飯田橋",
+            "大手町", "日本橋", "人形町", "築地", "新橋", "虎ノ門", "浜松町", "田町",
+            "品川", "五反田", "目黒", "中目黒", "代官山", "下北沢", "中野", "高円寺",
+            "吉祥寺", "三軒茶屋", "二子玉川", "自由が丘", "蒲田", "北千住", "錦糸町",
+            "浅草", "町田", "横浜", "桜木町", "関内", "みなとみらい", "川崎", "武蔵小杉",
+            "溝の口", "藤沢", "大宮", "浦和", "川越", "柏", "船橋", "千葉", "津田沼",
+            "宇都宮", "高崎", "水戸", "つくば"
+        ]),
+        ("中部", [
+            "甲府", "長野", "松本", "名古屋", "栄", "名駅", "金山", "伏見", "今池",
+            "豊田", "岐阜", "四日市", "静岡", "浜松", "新潟", "富山", "金沢", "福井"
+        ]),
+        ("関西", [
+            "梅田", "難波", "天王寺", "心斎橋", "京橋（大阪）", "福島（大阪）", "北新地",
+            "天満", "新大阪", "堺東", "京都駅周辺", "四条烏丸", "河原町", "祇園", "木屋町",
+            "先斗町", "三宮", "元町", "神戸駅周辺", "姫路", "西宮北口", "奈良", "和歌山"
+        ]),
+        ("九州・沖縄", [
+            "博多", "天神", "中洲", "小倉", "久留米", "佐賀", "長崎", "熊本", "大分",
+            "宮崎", "鹿児島", "那覇", "国際通り", "松山（沖縄）"
+        ]),
+        ("北海道・東北", [
+            "すすきの", "札幌駅周辺", "函館", "旭川", "帯広", "仙台", "国分町", "青森",
+            "盛岡", "秋田", "山形", "郡山", "福島（福島県）", "いわき"
+        ]),
+        ("中国・四国", [
+            "広島", "流川", "岡山", "倉敷", "高松", "松山", "高知", "徳島", "鳥取",
+            "松江", "下関", "宇部"
+        ]),
+        ("その他", ["その他"])
     ]
+
+    private static let drinkingAreaOptions: [String] = drinkingAreaGroupedOptions.flatMap(\.areas)
+
+    private var frequentDrinkingAreaDisplayText: String {
+        frequentDrinkingAreas.joined(separator: Self.drinkingAreaSeparator)
+    }
+
+    private var frequentDrinkingAreaStoredValue: String {
+        frequentDrinkingAreaDisplayText
+    }
+
+    private static func parseDrinkingAreas(from rawValue: String) -> [String] {
+        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty { return [] }
+
+        let normalized = trimmed
+            .replacingOccurrences(of: "，", with: ",")
+            .replacingOccurrences(of: "、", with: ",")
+            .replacingOccurrences(of: " / ", with: ",")
+            .replacingOccurrences(of: "/", with: ",")
+        var deduped: [String] = []
+        for token in normalized.split(separator: ",") {
+            let area = token.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !area.isEmpty else { continue }
+            if !deduped.contains(area) {
+                deduped.append(area)
+            }
+        }
+        if deduped.contains("非公開") {
+            return ["非公開"]
+        }
+        return Array(deduped.prefix(drinkingAreaMaxSelection))
+    }
 }
 
 private struct SelectionSheetView: View {
@@ -712,5 +793,107 @@ private struct SelectionSheetView: View {
                 }
             }
         }
+    }
+}
+
+private struct DrinkingAreaSelectionSheetView: View {
+    @Environment(\.dismiss) private var dismiss
+    let title: String
+    let groupedOptions: [(region: String, areas: [String])]
+    @Binding var selectedValues: [String]
+    let maxSelection: Int
+    @State private var searchText = ""
+
+    private var filteredGroupedOptions: [(region: String, areas: [String])] {
+        let keyword = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if keyword.isEmpty {
+            return groupedOptions
+        }
+        return groupedOptions.compactMap { group in
+            let filteredAreas = group.areas.filter { $0.localizedCaseInsensitiveContains(keyword) }
+            return filteredAreas.isEmpty ? nil : (group.region, filteredAreas)
+        }
+    }
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Color.black.ignoresSafeArea()
+                List {
+                    ForEach(filteredGroupedOptions, id: \.region) { group in
+                        Section(group.region) {
+                            ForEach(group.areas, id: \.self) { option in
+                                Button {
+                                    toggleSelection(of: option)
+                                } label: {
+                                    HStack {
+                                        Text(option)
+                                            .foregroundColor(.white)
+                                        Spacer()
+                                        if selectedValues.contains(option) {
+                                            Image(systemName: "checkmark")
+                                                .foregroundColor(.blue)
+                                        }
+                                    }
+                                }
+                                .disabled(isDisabled(option: option))
+                                .opacity(isDisabled(option: option) ? 0.45 : 1)
+                                .listRowBackground(Color.black)
+                            }
+                        }
+                    }
+                }
+                .listStyle(.insetGrouped)
+                .scrollContentBackground(.hidden)
+            }
+            .navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
+            .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "地域を検索")
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        dismiss()
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "chevron.left")
+                            Text("戻る")
+                        }
+                        .foregroundColor(.white)
+                    }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("完了") {
+                        dismiss()
+                    }
+                    .foregroundColor(.white)
+                }
+            }
+        }
+    }
+
+    private func toggleSelection(of option: String) {
+        if option == "非公開" {
+            if selectedValues.contains(option) {
+                selectedValues.removeAll { $0 == option }
+            } else {
+                selectedValues = [option]
+            }
+            return
+        }
+
+        if let index = selectedValues.firstIndex(of: option) {
+            selectedValues.remove(at: index)
+            return
+        }
+
+        selectedValues.removeAll { $0 == "非公開" }
+        guard selectedValues.count < maxSelection else { return }
+        selectedValues.append(option)
+    }
+
+    private func isDisabled(option: String) -> Bool {
+        if selectedValues.contains(option) { return false }
+        if option == "非公開" { return false }
+        return !selectedValues.contains("非公開") && selectedValues.count >= maxSelection
     }
 }
