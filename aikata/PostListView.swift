@@ -91,8 +91,8 @@ struct PostListView: View {
                         postsListener?.remove()
                         postsListener = nil
                     }
-                    .onChange(of: firestoreService.posts) { _, posts in
-                        avatarStore.observeIfNeeded(userIds: posts.map(\.userId))
+                    .onChange(of: firestoreService.posts.map(\.userId)) { _, userIds in
+                        avatarStore.observeIfNeeded(userIds: userIds)
                     }
                     .onReceive(showReportPublisher) { notification in
                         if let userInfo = notification.userInfo, let post = userInfo["post"] as? Post {
