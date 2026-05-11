@@ -86,6 +86,52 @@ class FirestoreService: ObservableObject {
             self.errorMessage = "読み込みに失敗しました: \(error.localizedDescription)"
         }
     }
+
+    func observePosts(
+        for gender: Gender,
+        filter: PostFilter? = nil,
+        currentUserId: String? = nil,
+        limit: Int = 50,
+        onChange: @escaping (Result<[Post], Error>) -> Void
+    ) -> ListenerRegistration {
+        var query: Query = db.collection("posts")
+            .whereField("gender", isEqualTo: gender.rawValue)
+
+        if let filter = filter {
+            if filter.onlyMyPosts, let userId = currentUserId {
+                query = query.whereField("userId", isEqualTo: userId)
+            }
+            if !filter.regions.isEmpty {
+                query = query.whereField("regions", arrayContainsAny: filter.regions)
+            }
+        }
+
+        query = query.order(by: "createdAt", descending: true).limit(to: limit)
+
+        return query.addSnapshotListener { snapshot, error in
+            if let error = error {
+                onChange(.failure(error))
+                return
+            }
+            guard let snapshot = snapshot else {
+                onChange(.success([]))
+                return
+            }
+            var fetchedPosts = snapshot.documents.compactMap { document -> Post? in
+                var post = try? document.data(as: Post.self)
+                post?.id = document.documentID
+                return post
+            }
+            if let filter = filter {
+                fetchedPosts = fetchedPosts.filter { post in
+                    let age = post.userAge ?? 0
+                    if age == 0 { return true }
+                    return age >= filter.minAge && age <= filter.maxAge
+                }
+            }
+            onChange(.success(fetchedPosts))
+        }
+    }
     
     // Fetch more posts (Infinite scrolling)
     @MainActor
@@ -188,7 +234,13 @@ class FirestoreService: ObservableObject {
             throw NSError(domain: "ProfileImage", code: 2001, userInfo: [NSLocalizedDescriptionKey: "プロフィール画像の圧縮に失敗しました。"])
         }
         let path = "profile_images/\(userId)/\(UUID().uuidString).jpg"
-        return try await uploadImageDataWithRetry(data: data, path: path, retryCount: 2)
+        let uploaded = try await uploadImageDataWithRetry(data: data, path: path, retryCount: 2)
+        if uploaded.hasPrefix("storage://") {
+            let ref = storage.reference().child(path)
+            let url = try await downloadURLWithRetry(ref: ref, retryCount: 3)
+            return url.absoluteString
+        }
+        return uploaded
     }
 
     func saveUserProfile(
@@ -226,6 +278,54 @@ class FirestoreService: ObservableObject {
             "frequentDrinkingArea": frequentDrinkingArea
         ]
         try await db.collection("users").document(userId).setData(data, merge: true)
+    }
+
+    func propagateProfileImageUpdate(userId: String, profileImageURL: String) async throws {
+        try await updatePostProfileImages(userId: userId, profileImageURL: profileImageURL)
+        try await updateChatRoomProfileImages(userId: userId, profileImageURL: profileImageURL)
+    }
+
+    private func updatePostProfileImages(userId: String, profileImageURL: String) async throws {
+        var lastDoc: DocumentSnapshot?
+        while true {
+            var query = db.collection("posts")
+                .whereField("userId", isEqualTo: userId)
+                .order(by: "createdAt", descending: true)
+                .limit(to: 400)
+            if let lastDoc {
+                query = query.start(afterDocument: lastDoc)
+            }
+            let snapshot = try await query.getDocuments()
+            if snapshot.documents.isEmpty { break }
+            let batch = db.batch()
+            snapshot.documents.forEach { doc in
+                batch.updateData(["userProfileImageUrl": profileImageURL], forDocument: doc.reference)
+            }
+            try await batch.commit()
+            lastDoc = snapshot.documents.last
+            if snapshot.documents.count < 400 { break }
+        }
+    }
+
+    private func updateChatRoomProfileImages(userId: String, profileImageURL: String) async throws {
+        let snapshot = try await db.collection("chatRooms")
+            .whereField("members", arrayContains: userId)
+            .getDocuments()
+        if snapshot.documents.isEmpty { return }
+
+        var startIndex = 0
+        let docs = snapshot.documents
+        while startIndex < docs.count {
+            let endIndex = min(startIndex + 400, docs.count)
+            let batch = db.batch()
+            for i in startIndex..<endIndex {
+                let ref = docs[i].reference
+                let path = FieldPath(["memberImageUrls", userId])
+                batch.updateData([path: profileImageURL], forDocument: ref)
+            }
+            try await batch.commit()
+            startIndex = endIndex
+        }
     }
 
     // Fetch latest chat history for a room and return in chronological order
@@ -364,6 +464,51 @@ class FirestoreService: ObservableObject {
             lastDocument: snapshot.documents.last,
             hasMore: snapshot.documents.count == limit
         )
+    }
+
+    func observeChatRooms(
+        userId: String,
+        limit: Int = 50,
+        onChange: @escaping (Result<[ChatRoomSummary], Error>) -> Void
+    ) -> ListenerRegistration {
+        let query = db.collection("chatRooms")
+            .whereField("members", arrayContains: userId)
+            .order(by: "lastMessageAt", descending: true)
+            .limit(to: limit)
+
+        return query.addSnapshotListener { [weak self] snapshot, error in
+            if let error = error {
+                onChange(.failure(error))
+                return
+            }
+            guard let snapshot = snapshot, let self = self else {
+                onChange(.success([]))
+                return
+            }
+            let rooms = snapshot.documents.compactMap { self.decodeChatRoom(document: $0) }
+            onChange(.success(rooms))
+        }
+    }
+
+    func observeChatRoomSummary(
+        chatRoomId: String,
+        onChange: @escaping (Result<ChatRoomSummary?, Error>) -> Void
+    ) -> ListenerRegistration {
+        db.collection("chatRooms").document(chatRoomId).addSnapshotListener { [weak self] snapshot, error in
+            if let error = error {
+                onChange(.failure(error))
+                return
+            }
+            guard let snapshot, let self = self else {
+                onChange(.success(nil))
+                return
+            }
+            if !snapshot.exists {
+                onChange(.success(nil))
+                return
+            }
+            onChange(.success(self.decodeChatRoom(document: snapshot)))
+        }
     }
 
     func fetchMoreChatRooms(userId: String, lastDocument: DocumentSnapshot, limit: Int = 20) async throws -> ChatRoomPage {

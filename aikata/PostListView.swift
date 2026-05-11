@@ -1,10 +1,13 @@
 import SwiftUI
 import UIKit
+import FirebaseFirestore
 
 struct PostListView: View {
     @EnvironmentObject var authManager: AuthManager
     @StateObject private var firestoreService = FirestoreService()
+    @StateObject private var avatarStore = UserAvatarStore()
     @State private var isShowingCreatePost = false
+    @State private var postsListener: ListenerRegistration? = nil
     
     // For Report View
     @State private var selectedPostToReport: Post? = nil
@@ -69,6 +72,7 @@ struct PostListView: View {
                                             post: post,
                                             screenWidth: mainGeometry.size.width,
                                             currentUser: authManager.currentUser,
+                                            avatarStore: avatarStore,
                                             isChatRoomPresented: $isChatRoomPresented
                                         )
                                         
@@ -143,12 +147,46 @@ struct PostListView: View {
                             Task {
                                 await firestoreService.fetchPosts(for: user.gender, filter: postFilter.isActive ? postFilter : nil, currentUserId: user.id)
                             }
+                            postsListener?.remove()
+                            postsListener = firestoreService.observePosts(
+                                for: user.gender,
+                                filter: postFilter.isActive ? postFilter : nil,
+                                currentUserId: user.id,
+                                limit: 60
+                            ) { result in
+                                Task { @MainActor in
+                                    switch result {
+                                    case .success(let posts):
+                                        firestoreService.posts = posts
+                                        firestoreService.hasMore = false
+                                        firestoreService.errorMessage = nil
+                                    case .failure(let error):
+                                        firestoreService.errorMessage = error.localizedDescription
+                                    }
+                                }
+                            }
+                            avatarStore.observeIfNeeded(userIds: firestoreService.posts.map(\.userId))
                         }
+                    }
+                    .onDisappear {
+                        postsListener?.remove()
+                        postsListener = nil
+                    }
+                    .onChange(of: firestoreService.posts) { _, posts in
+                        avatarStore.observeIfNeeded(userIds: posts.map(\.userId))
                     }
                     .onReceive(showReportPublisher) { notification in
                         if let userInfo = notification.userInfo, let post = userInfo["post"] as? Post {
                             self.selectedPostToReport = post
                         }
+                    }
+                    .onReceive(NotificationCenter.default.publisher(for: .userAvatarDidUpdate)) { notification in
+                        guard
+                            let userInfo = notification.userInfo,
+                            let userId = userInfo["userId"] as? String,
+                            let profileImageUrl = userInfo["profileImageUrl"] as? String
+                        else { return }
+                        firestoreService.posts = AvatarSync.updatedPosts(firestoreService.posts, userId: userId, profileImageUrl: profileImageUrl)
                     }
                     .sheet(item: $selectedPostToReport) { post in
                         if let currentUser = authManager.currentUser {
@@ -204,6 +242,7 @@ struct PostListView: View {
         let post: Post
         let screenWidth: CGFloat
         let currentUser: AppUser?
+        let avatarStore: UserAvatarStore
         @Binding var isChatRoomPresented: Bool
         
         var body: some View {
@@ -214,7 +253,7 @@ struct PostListView: View {
                 // Header: Avatar + User Info + Time
                 HStack(alignment: .center, spacing: 12) {
                     // Avatar
-                AsyncImage(url: URL(string: post.userProfileImageUrl ?? "")) { image in
+                AsyncImage(url: URL(string: avatarStore.profileImageUrl(userId: post.userId) ?? post.userProfileImageUrl ?? "")) { image in
                     image
                         .resizable()
                         .aspectRatio(contentMode: .fill)

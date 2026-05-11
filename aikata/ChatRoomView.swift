@@ -16,6 +16,7 @@ struct ChatRoomView: View {
     @Binding var isChatRoomPresented: Bool
 
     @StateObject private var firestoreService = FirestoreService()
+    @StateObject private var avatarStore = UserAvatarStore()
     @State private var messages: [Message] = []
     @State private var isLoading = false
     @State private var isLoadingOlder = false
@@ -33,6 +34,8 @@ struct ChatRoomView: View {
     @State private var uploadStatusMessage: String? = nil
     @State private var alertMessage: String? = nil
     @State private var didInitialScrollToBottom = false
+    @State private var liveChatPartnerImageUrl: String?
+    @State private var chatRoomSummaryListener: ListenerRegistration? = nil
 
     private var chatRoomId: String {
         makeChatRoomId(userId1: currentUserId, userId2: chatPartnerId)
@@ -40,6 +43,31 @@ struct ChatRoomView: View {
 
     private var trimmedMessageText: String {
         messageText.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    
+    private var displayedChatPartnerImageUrl: String? {
+        let live = liveChatPartnerImageUrl?.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let live, !live.isEmpty { return live }
+        return avatarStore.profileImageUrl(userId: chatPartnerId)
+    }
+
+    init(
+        currentUserId: String,
+        chatPartnerId: String,
+        chatPartnerName: String,
+        chatPartnerImageUrl: String?,
+        sourcePostId: String,
+        currentUser: AppUser?,
+        isChatRoomPresented: Binding<Bool>
+    ) {
+        self.currentUserId = currentUserId
+        self.chatPartnerId = chatPartnerId
+        self.chatPartnerName = chatPartnerName
+        self.chatPartnerImageUrl = chatPartnerImageUrl
+        self.sourcePostId = sourcePostId
+        self.currentUser = currentUser
+        _isChatRoomPresented = isChatRoomPresented
+        _liveChatPartnerImageUrl = State(initialValue: chatPartnerImageUrl)
     }
 
     var body: some View {
@@ -79,7 +107,7 @@ struct ChatRoomView: View {
                                 MessageBubble(
                                     message: message,
                                     isCurrentUser: message.senderId == currentUserId,
-                                    chatPartnerImageUrl: chatPartnerImageUrl
+                                    chatPartnerImageUrl: displayedChatPartnerImageUrl
                                 )
                                 .id(messageScrollId(message))
                                 .onAppear {
@@ -154,7 +182,7 @@ struct ChatRoomView: View {
 
             ToolbarItem(placement: .principal) {
                 HStack(spacing: 10) {
-                    AsyncImage(url: URL(string: chatPartnerImageUrl ?? "")) { image in
+                    AsyncImage(url: URL(string: displayedChatPartnerImageUrl ?? "")) { image in
                         image
                             .resizable()
                             .aspectRatio(contentMode: .fill)
@@ -205,6 +233,17 @@ struct ChatRoomView: View {
         .task {
             await loadInitialMessages()
             startRealtimeListener()
+            startChatRoomSummaryListener()
+            avatarStore.observeIfNeeded(userIds: [chatPartnerId])
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .userAvatarDidUpdate)) { notification in
+            guard
+                let userInfo = notification.userInfo,
+                let userId = userInfo["userId"] as? String,
+                let profileImageUrl = userInfo["profileImageUrl"] as? String
+            else { return }
+            guard userId == chatPartnerId else { return }
+            liveChatPartnerImageUrl = profileImageUrl
         }
         .onChange(of: selectedPhotoItems) { items in
             guard !items.isEmpty else { return }
@@ -228,6 +267,8 @@ struct ChatRoomView: View {
             isChatRoomPresented = false
             listener?.remove()
             listener = nil
+            chatRoomSummaryListener?.remove()
+            chatRoomSummaryListener = nil
         }
     }
 
@@ -330,6 +371,21 @@ struct ChatRoomView: View {
         }
     }
 
+    private func startChatRoomSummaryListener() {
+        chatRoomSummaryListener?.remove()
+        chatRoomSummaryListener = firestoreService.observeChatRoomSummary(chatRoomId: chatRoomId) { result in
+            switch result {
+            case .success(let summary):
+                guard let summary else { return }
+                Task { @MainActor in
+                    liveChatPartnerImageUrl = summary.memberImageUrls[chatPartnerId]
+                }
+            case .failure:
+                break
+            }
+        }
+    }
+
     @MainActor
     private func sendCurrentMessage() async {
         guard !trimmedMessageText.isEmpty, !isSending else { return }
@@ -346,7 +402,7 @@ struct ChatRoomView: View {
                 senderName: currentUser?.name,
                 senderImageUrl: currentUser?.profileImageUrl,
                 receiverName: chatPartnerName,
-                receiverImageUrl: chatPartnerImageUrl
+                receiverImageUrl: displayedChatPartnerImageUrl
             )
             let generator = UIImpactFeedbackGenerator(style: .light)
             generator.prepare()
@@ -477,7 +533,7 @@ struct ChatRoomView: View {
                 senderName: currentUser?.name,
                 senderImageUrl: currentUser?.profileImageUrl,
                 receiverName: chatPartnerName,
-                receiverImageUrl: chatPartnerImageUrl
+                receiverImageUrl: displayedChatPartnerImageUrl
             )
             let generator = UIImpactFeedbackGenerator(style: .light)
             generator.prepare()

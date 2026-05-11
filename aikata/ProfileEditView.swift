@@ -472,6 +472,9 @@ struct ProfileEditView: View {
                 birthplace: birthplace,
                 frequentDrinkingArea: frequentDrinkingAreaStoredValue
             )
+            if normalize(nextImageURL) != normalize(user.profileImageUrl ?? "") {
+                try await firestoreService.propagateProfileImageUpdate(userId: userId, profileImageURL: nextImageURL)
+            }
 
             var updated = user
             updated.profileImageUrl = nextImageURL.isEmpty ? nil : nextImageURL
@@ -487,6 +490,14 @@ struct ProfileEditView: View {
             updated.frequentDrinkingArea = normalize(frequentDrinkingAreaStoredValue)
 
             authManager.updateCurrentUser(updated)
+            NotificationCenter.default.post(
+                name: .userAvatarDidUpdate,
+                object: nil,
+                userInfo: [
+                    "userId": userId,
+                    "profileImageUrl": nextImageURL
+                ]
+            )
             dismiss()
         } catch {
             errorMessage = "保存に失敗しました: \(error.localizedDescription)"

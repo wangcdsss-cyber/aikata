@@ -3,6 +3,13 @@ import SwiftUI
 struct PostDetailView: View {
     let post: Post
     @Environment(\.dismiss) var dismiss
+    @State private var currentPost: Post
+    @StateObject private var avatarStore = UserAvatarStore()
+
+    init(post: Post) {
+        self.post = post
+        _currentPost = State(initialValue: post)
+    }
     
     var body: some View {
         ZStack {
@@ -13,7 +20,7 @@ struct PostDetailView: View {
                     // Header: Avatar + User Info + Time
                     HStack(alignment: .top, spacing: 12) {
                         // Avatar
-                        AsyncImage(url: URL(string: post.userProfileImageUrl ?? "")) { image in
+                        AsyncImage(url: URL(string: avatarStore.profileImageUrl(userId: currentPost.userId) ?? currentPost.userProfileImageUrl ?? "")) { image in
                             image
                                 .resizable()
                                 .aspectRatio(contentMode: .fill)
@@ -28,18 +35,18 @@ struct PostDetailView: View {
                         // User Info
                         VStack(alignment: .leading, spacing: 4) {
                             HStack {
-                                Text(post.userName)
+                                Text(currentPost.userName)
                                     .font(.system(size: 18, weight: .bold))
                                     .foregroundColor(.white)
                                 Spacer()
-                                Text(post.createdAt.relativeTimeString())
+                                Text(currentPost.createdAt.relativeTimeString())
                                     .font(.system(size: 14))
                                     .foregroundColor(.gray)
                                 Image(systemName: "ellipsis")
                                     .foregroundColor(.gray)
                             }
                             
-                            Text("\(post.userAge.map { "\($0)歳" } ?? "年齢非公開")   \(post.userJob ?? "職業非公開")")
+                            Text("\(currentPost.userAge.map { "\($0)歳" } ?? "年齢非公開")   \(currentPost.userJob ?? "職業非公開")")
                                 .font(.system(size: 14))
                                 .foregroundColor(.gray)
                         }
@@ -47,19 +54,19 @@ struct PostDetailView: View {
                     .padding(.top, 16)
                     
                     // Regions
-                    if !post.regions.isEmpty {
+                    if !currentPost.regions.isEmpty {
                         HStack(alignment: .top, spacing: 4) {
                             Text("希望地域:")
                                 .font(.system(size: 14))
                                 .foregroundColor(.gray)
-                            Text(post.regions.joined(separator: ", "))
+                            Text(currentPost.regions.joined(separator: ", "))
                                 .font(.system(size: 14))
                                 .foregroundColor(.gray)
                         }
                     }
                     
                     // Content
-                    Text(post.content)
+                    Text(currentPost.content)
                         .font(.system(size: 16))
                         .foregroundColor(.white)
                         .lineSpacing(6)
@@ -93,6 +100,18 @@ struct PostDetailView: View {
                         .font(.system(size: 18, weight: .semibold))
                 }
             }
+        }
+        .onAppear {
+            avatarStore.observeIfNeeded(userIds: [currentPost.userId])
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .userAvatarDidUpdate)) { notification in
+            guard
+                let userInfo = notification.userInfo,
+                let userId = userInfo["userId"] as? String,
+                let profileImageUrl = userInfo["profileImageUrl"] as? String
+            else { return }
+            guard currentPost.userId == userId else { return }
+            currentPost.userProfileImageUrl = profileImageUrl
         }
     }
 }

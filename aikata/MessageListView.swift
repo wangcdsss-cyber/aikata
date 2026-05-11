@@ -4,6 +4,7 @@ import FirebaseFirestore
 struct MessageListView: View {
     @EnvironmentObject var authManager: AuthManager
     @StateObject private var firestoreService = FirestoreService()
+    @StateObject private var avatarStore = UserAvatarStore()
 
     @State private var chatRooms: [ChatRoomSummary] = []
     @State private var isLoading = false
@@ -16,6 +17,7 @@ struct MessageListView: View {
     @State private var rollbackIndex: Int? = nil
     @State private var selectedRoomToReport: ChatRoomSummary? = nil
     @State private var alertMessage: String? = nil
+    @State private var chatRoomsListener: ListenerRegistration? = nil
 
     private let pageSize = 20
 
@@ -59,6 +61,7 @@ struct MessageListView: View {
                                     ChatRoomRow(
                                         room: room,
                                         currentUserId: authManager.currentUser?.id ?? "",
+                                        avatarStore: avatarStore,
                                         onDeleteTapped: { roomToDelete = room },
                                         onReportTapped: { selectedRoomToReport = room }
                                     )
@@ -89,7 +92,25 @@ struct MessageListView: View {
             .navigationBarTitleDisplayMode(.inline)
             .task {
                 await loadInitial()
+                startChatRoomsListener()
             }
+            .onChange(of: chatRooms) { _, rooms in
+                let currentUserId = authManager.currentUser?.id ?? ""
+                let partnerIds = rooms.map { $0.partnerId(currentUserId: currentUserId) }
+                avatarStore.observeIfNeeded(userIds: partnerIds)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .userAvatarDidUpdate)) { notification in
+                guard
+                    let userInfo = notification.userInfo,
+                    let userId = userInfo["userId"] as? String,
+                    let profileImageUrl = userInfo["profileImageUrl"] as? String
+                else { return }
+                chatRooms = AvatarSync.updatedChatRooms(chatRooms, userId: userId, profileImageUrl: profileImageUrl)
+            }
+        }
+        .onDisappear {
+            chatRoomsListener?.remove()
+            chatRoomsListener = nil
         }
         .alert("削除確認", isPresented: Binding(
             get: { roomToDelete != nil },
@@ -144,6 +165,24 @@ struct MessageListView: View {
     }
 
     @MainActor
+    private func startChatRoomsListener() {
+        guard let userId = authManager.currentUser?.id else { return }
+        chatRoomsListener?.remove()
+        chatRoomsListener = firestoreService.observeChatRooms(userId: userId, limit: 60) { result in
+            Task { @MainActor in
+                switch result {
+                case .success(let rooms):
+                    chatRooms = rooms
+                    hasMore = false
+                    lastDocument = nil
+                case .failure(let error):
+                    alertMessage = "読み込みに失敗しました: \(error.localizedDescription)"
+                }
+            }
+        }
+    }
+
+    @MainActor
     private func loadMoreIfNeeded() async {
         guard
             !isLoadingMore,
@@ -194,12 +233,14 @@ struct MessageListView: View {
 private struct ChatRoomRow: View {
     let room: ChatRoomSummary
     let currentUserId: String
+    let avatarStore: UserAvatarStore
     let onDeleteTapped: () -> Void
     let onReportTapped: () -> Void
 
     var body: some View {
+        let partnerId = room.partnerId(currentUserId: currentUserId)
         HStack(spacing: 10) {
-            AsyncImage(url: URL(string: room.partnerImageUrl(currentUserId: currentUserId) ?? "")) { image in
+            AsyncImage(url: URL(string: avatarStore.profileImageUrl(userId: partnerId) ?? room.partnerImageUrl(currentUserId: currentUserId) ?? "")) { image in
                 image.resizable().aspectRatio(contentMode: .fill)
             } placeholder: {
                 Image(systemName: "person.circle.fill")
