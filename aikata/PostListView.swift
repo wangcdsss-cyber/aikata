@@ -24,88 +24,7 @@ struct PostListView: View {
         GeometryReader { mainGeometry in
             ZStack {
                 NavigationView {
-                    Group {
-                        if firestoreService.posts.isEmpty && !firestoreService.isFetching {
-                            VStack(spacing: 12) {
-                                if let errorMessage = firestoreService.errorMessage {
-                                    Text("読み込みエラー")
-                                        .foregroundColor(.red)
-                                    Text(errorMessage)
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                        .multilineTextAlignment(.center)
-                                        .padding(.horizontal, 16)
-                                } else {
-                                    Text("投稿がありません")
-                                        .foregroundColor(.secondary)
-                                    Text("最初の投稿をしてみましょう！")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-                                
-                                Button("再読み込み") {
-                                    if let user = authManager.currentUser {
-                                        Task {
-                                            await firestoreService.fetchPosts(
-                                                for: user.gender,
-                                                filter: postFilter.isActive ? postFilter : nil,
-                                                currentUserId: user.id,
-                                                isRefresh: true
-                                            )
-                                        }
-                                    }
-                                }
-                                .padding(.top, 8)
-                            }
-                        } else if firestoreService.posts.isEmpty && firestoreService.isFetching {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                        } else {
-                            ScrollView {
-                                LazyVStack(spacing: 0) { // Changed to 0 spacing for divider control
-                                    Divider()
-                                        .background(Color(hex: "#333333")) // Subtle light/gray divider
-                                        .padding(.horizontal, 16)
-                                        
-                                    ForEach(firestoreService.posts) { post in
-                                        PostRow(
-                                            post: post,
-                                            screenWidth: mainGeometry.size.width,
-                                            currentUser: authManager.currentUser,
-                                            avatarStore: avatarStore,
-                                            isChatRoomPresented: $isChatRoomPresented
-                                        )
-                                        
-                                        Divider()
-                                            .background(Color(hex: "#333333")) // Subtle light/gray divider
-                                            .padding(.horizontal, 16)
-                                            
-                                        // Pagination trigger
-                                        if post.id == firestoreService.posts.last?.id && firestoreService.hasMore {
-                                            ProgressView()
-                                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                                .padding()
-                                                .onAppear {
-                                                    if let user = authManager.currentUser {
-                                                        Task {
-                                                            await firestoreService.fetchMorePosts(for: user.gender, filter: postFilter.isActive ? postFilter : nil, currentUserId: user.id)
-                                                        }
-                                                    }
-                                                }
-                                        }
-                                    }
-                                }
-                                .padding(.top, 0) // Reduced top padding to move list higher
-                                .padding(.bottom, 80) // FAB padding
-                            }
-                            .background(Color.black)
-                            .refreshable {
-                                if let user = authManager.currentUser {
-                                    await firestoreService.fetchPosts(for: user.gender, filter: postFilter.isActive ? postFilter : nil, currentUserId: user.id, isRefresh: true)
-                                }
-                            }
-                        }
-                    }
+                    contentView(screenWidth: mainGeometry.size.width)
                     .background(Color.black.edgesIgnoringSafeArea(.all))
                     .navigationTitle("\(authManager.currentUser?.gender.rawValue ?? "")掲示板")
                     .navigationBarTitleDisplayMode(.inline)
@@ -237,6 +156,107 @@ struct PostListView: View {
             }
         }
     }
+
+    private func contentView(screenWidth: CGFloat) -> AnyView {
+        if firestoreService.posts.isEmpty && !firestoreService.isFetching {
+            return AnyView(emptyStateView)
+        }
+        if firestoreService.posts.isEmpty && firestoreService.isFetching {
+            return AnyView(
+                ProgressView()
+                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+            )
+        }
+        return AnyView(postsListView(screenWidth: screenWidth))
+    }
+
+    private var emptyStateView: some View {
+        VStack(spacing: 12) {
+            if let errorMessage = firestoreService.errorMessage {
+                Text("読み込みエラー")
+                    .foregroundColor(.red)
+                Text(errorMessage)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 16)
+            } else {
+                Text("投稿がありません")
+                    .foregroundColor(.secondary)
+                Text("最初の投稿をしてみましょう！")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            Button("再読み込み") {
+                if let user = authManager.currentUser {
+                    Task {
+                        await firestoreService.fetchPosts(
+                            for: user.gender,
+                            filter: postFilter.isActive ? postFilter : nil,
+                            currentUserId: user.id,
+                            isRefresh: true
+                        )
+                    }
+                }
+            }
+            .padding(.top, 8)
+        }
+    }
+
+    private func postsListView(screenWidth: CGFloat) -> some View {
+        ScrollView {
+            LazyVStack(spacing: 0) {
+                Divider()
+                    .background(Color(hex: "#333333"))
+                    .padding(.horizontal, 16)
+
+                ForEach(firestoreService.posts) { post in
+                    PostRow(
+                        post: post,
+                        screenWidth: screenWidth,
+                        currentUser: authManager.currentUser,
+                        avatarStore: avatarStore,
+                        isChatRoomPresented: $isChatRoomPresented
+                    )
+
+                    Divider()
+                        .background(Color(hex: "#333333"))
+                        .padding(.horizontal, 16)
+
+                    if post.id == firestoreService.posts.last?.id && firestoreService.hasMore {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            .padding()
+                            .onAppear {
+                                if let user = authManager.currentUser {
+                                    Task {
+                                        await firestoreService.fetchMorePosts(
+                                            for: user.gender,
+                                            filter: postFilter.isActive ? postFilter : nil,
+                                            currentUserId: user.id
+                                        )
+                                    }
+                                }
+                            }
+                    }
+                }
+            }
+            .padding(.top, 0)
+            .padding(.bottom, 80)
+        }
+        .background(Color.black)
+        .refreshable {
+            if let user = authManager.currentUser {
+                await firestoreService.fetchPosts(
+                    for: user.gender,
+                    filter: postFilter.isActive ? postFilter : nil,
+                    currentUserId: user.id,
+                    isRefresh: true
+                )
+            }
+        }
+    }
     
     struct PostRow: View {
         let post: Post
@@ -244,6 +264,16 @@ struct PostListView: View {
         let currentUser: AppUser?
         let avatarStore: UserAvatarStore
         @Binding var isChatRoomPresented: Bool
+
+        private var resolvedAvatarUrl: URL? {
+            let storeUrl = avatarStore.profileImageUrl(userId: post.userId)?
+                .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let fallbackUrl = post.userProfileImageUrl?
+                .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let urlString = !storeUrl.isEmpty ? storeUrl : fallbackUrl
+            if urlString.isEmpty { return nil }
+            return URL(string: urlString)
+        }
         
         var body: some View {
             let horizontalPadding: CGFloat = screenWidth <= 375 ? 12 : 16
@@ -253,17 +283,17 @@ struct PostListView: View {
                 // Header: Avatar + User Info + Time
                 HStack(alignment: .center, spacing: 12) {
                     // Avatar
-                AsyncImage(url: URL(string: avatarStore.profileImageUrl(userId: post.userId) ?? post.userProfileImageUrl ?? "")) { image in
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                } placeholder: {
-                    Image(systemName: "person.circle.fill")
-                        .resizable()
-                        .foregroundColor(Color(hex: "#E0E0E0"))
-                }
-                .frame(width: avatarSize, height: avatarSize)
-                .clipShape(Circle())
+                    AsyncImage(url: resolvedAvatarUrl) { image in
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                    } placeholder: {
+                        Image(systemName: "person.circle.fill")
+                            .resizable()
+                            .foregroundColor(Color(hex: "#E0E0E0"))
+                    }
+                    .frame(width: avatarSize, height: avatarSize)
+                    .clipShape(Circle())
                 
                 // User Info
                 VStack(alignment: .leading, spacing: 4) {
