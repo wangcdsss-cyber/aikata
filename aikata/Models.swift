@@ -22,6 +22,15 @@ struct AppUser: Codable, Identifiable {
     var age: Int?
     var job: String?
     var residence: String?
+    var selfIntroduction: String?
+    var education: String?
+    var height: String?
+    var bodyType: String?
+    var annualIncome: String?
+    var mbti: String?
+    var birthplace: String?
+    var workplace: String?
+    var frequentDrinkingArea: String?
     var createdAt: Date
 }
 

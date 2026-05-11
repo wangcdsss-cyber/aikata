@@ -54,4 +54,11 @@ class AuthManager: ObservableObject {
         
         self.currentUser = newUser
     }
+
+    func updateCurrentUser(_ user: AppUser) {
+        if let encoded = try? JSONEncoder().encode(user) {
+            UserDefaults.standard.set(encoded, forKey: "app_user")
+        }
+        self.currentUser = user
+    }
 }

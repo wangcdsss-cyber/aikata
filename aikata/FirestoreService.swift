@@ -177,6 +177,51 @@ class FirestoreService: ObservableObject {
         try db.collection("users").document(id).setData(from: user)
     }
 
+    func uploadProfileImage(userId: String, image: UIImage) async throws -> String {
+        guard let data = ChatImageCompressor.compressForUpload(image) else {
+            throw NSError(domain: "ProfileImage", code: 2001, userInfo: [NSLocalizedDescriptionKey: "プロフィール画像の圧縮に失敗しました。"])
+        }
+        let path = "profile_images/\(userId)/\(UUID().uuidString).jpg"
+        return try await uploadImageDataWithRetry(data: data, path: path, retryCount: 2)
+    }
+
+    func saveUserProfile(
+        userId: String,
+        profileImageURL: String?,
+        mbti: String,
+        workLocation: String,
+        occupation: String,
+        selfIntroduction: String,
+        education: String,
+        height: String,
+        bodyType: String,
+        annualIncome: String,
+        birthplace: String,
+        frequentDrinkingArea: String
+    ) async throws {
+        let introTrimmed = selfIntroduction.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
+        guard introTrimmed.count <= 500 else {
+            throw NSError(domain: "ProfileValidation", code: 2002, userInfo: [NSLocalizedDescriptionKey: "自己紹介は500文字以内で入力してください。"])
+        }
+
+        let data: [String: Any] = [
+            "profileImage": profileImageURL ?? "",
+            "mbti": mbti,
+            "workLocation": workLocation,
+            "occupation": occupation,
+            "updatedAt": Timestamp(date: Date()),
+            "userId": userId,
+            "selfIntroduction": introTrimmed,
+            "education": education,
+            "height": height,
+            "bodyType": bodyType,
+            "annualIncome": annualIncome,
+            "birthplace": birthplace,
+            "frequentDrinkingArea": frequentDrinkingArea
+        ]
+        try await db.collection("users").document(userId).setData(data, merge: true)
+    }
+
     // Fetch latest chat history for a room and return in chronological order
     func fetchMessages(chatRoomId: String, limit: Int = 20) async throws -> [Message] {
         let snapshot = try await db.collection("messages")
