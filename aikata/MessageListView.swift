@@ -316,8 +316,9 @@ private struct ChatRoomRow: View {
             }
             .frame(width: 135, alignment: .trailing)
         }
-        .frame(height: 72)
         .padding(.horizontal, 12)
+        .padding(.vertical, 14)
+        .frame(minHeight: 94, alignment: .center)
         .background(Color.black)
     }
 }
@@ -341,8 +342,9 @@ private struct ChatRoomSkeletonRow: View {
                 .fill(Color.white.opacity(0.12))
                 .frame(width: 80, height: 12)
         }
-        .frame(height: 72)
         .padding(.horizontal, 12)
+        .padding(.vertical, 14)
+        .frame(minHeight: 94, alignment: .center)
         .redacted(reason: .placeholder)
     }
 }
