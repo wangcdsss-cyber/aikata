@@ -546,7 +546,8 @@ struct ProfileEditView: View {
                 try await firestoreService.propagateUserPublicProfileUpdate(
                     userId: userId,
                     name: normalize(nickname),
-                    profileImageURL: nextImageURL
+                    profileImageURL: nextImageURL,
+                    occupation: normalize(occupation)
                 )
             }
 

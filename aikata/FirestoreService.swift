@@ -265,9 +265,12 @@ class FirestoreService: ObservableObject {
 
         let data: [String: Any] = [
             "name": name,
+            "profileImageUrl": profileImageURL ?? "",
             "profileImage": profileImageURL ?? "",
             "mbti": mbti,
+            "workplace": workLocation,
             "workLocation": workLocation,
+            "job": occupation,
             "occupation": occupation,
             "updatedAt": Timestamp(date: Date()),
             "userId": userId,
@@ -282,36 +285,35 @@ class FirestoreService: ObservableObject {
         try await db.collection("users").document(userId).setData(data, merge: true)
     }
 
-    func propagateUserPublicProfileUpdate(userId: String, name: String, profileImageURL: String) async throws {
-        try await updatePostUserPresentation(userId: userId, name: name, profileImageURL: profileImageURL)
+    func propagateUserPublicProfileUpdate(userId: String, name: String, profileImageURL: String, occupation: String) async throws {
+        try await updatePostUserPresentation(userId: userId, name: name, profileImageURL: profileImageURL, occupation: occupation)
         try await updateChatRoomUserPresentation(userId: userId, name: name, profileImageURL: profileImageURL)
     }
 
-    private func updatePostUserPresentation(userId: String, name: String, profileImageURL: String) async throws {
-        var lastDoc: DocumentSnapshot?
-        while true {
-            var query = db.collection("posts")
-                .whereField("userId", isEqualTo: userId)
-                .order(by: "createdAt", descending: true)
-                .limit(to: 400)
-            if let lastDoc {
-                query = query.start(afterDocument: lastDoc)
-            }
-            let snapshot = try await query.getDocuments()
-            if snapshot.documents.isEmpty { break }
+    private func updatePostUserPresentation(userId: String, name: String, profileImageURL: String, occupation: String) async throws {
+        let snapshot = try await db.collection("posts")
+            .whereField("userId", isEqualTo: userId)
+            .getDocuments()
+        if snapshot.documents.isEmpty { return }
+
+        var startIndex = 0
+        let docs = snapshot.documents
+        while startIndex < docs.count {
+            let endIndex = min(startIndex + 400, docs.count)
             let batch = db.batch()
-            snapshot.documents.forEach { doc in
+            for i in startIndex..<endIndex {
+                let ref = docs[i].reference
                 batch.updateData(
                     [
                         "userProfileImageUrl": profileImageURL,
-                        "userName": name
+                        "userName": name,
+                        "userJob": occupation
                     ],
-                    forDocument: doc.reference
+                    forDocument: ref
                 )
             }
             try await batch.commit()
-            lastDoc = snapshot.documents.last
-            if snapshot.documents.count < 400 { break }
+            startIndex = endIndex
         }
     }
 
