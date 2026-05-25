@@ -273,12 +273,32 @@ private struct ChatRoomRow: View {
             .clipShape(Circle())
 
             VStack(alignment: .leading, spacing: 6) {
-                Text(displayedName)
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundColor(.white)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                    Text(displayedName)
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundColor(.white)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+
+                    Spacer(minLength: 8)
+
+                    Text(room.lastMessageAt.chatRoomListDateString())
+                        .font(.system(size: 11))
+                        .foregroundColor(Color(hex: "#9E9E9E"))
+                        .lineLimit(1)
+
+                    Menu {
+                        Button("報告", action: onReportTapped)
+                        Button("削除", role: .destructive, action: onDeleteTapped)
+                    } label: {
+                        Image(systemName: "ellipsis")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.white)
+                            .frame(width: 24, height: 24)
+                            .contentShape(Rectangle())
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .topLeading)
 
                 if !profileLine.isEmpty {
                     Text(profileLine)
@@ -297,24 +317,6 @@ private struct ChatRoomRow: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-
-            HStack(spacing: 8) {
-                Text(room.lastMessageAt.chatRoomListDateString())
-                    .font(.system(size: 11))
-                    .foregroundColor(Color(hex: "#9E9E9E"))
-
-                Menu {
-                    Button("報告", action: onReportTapped)
-                    Button("削除", role: .destructive, action: onDeleteTapped)
-                } label: {
-                    Image(systemName: "ellipsis")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(.white)
-                        .frame(width: 24, height: 24)
-                        .contentShape(Rectangle())
-                }
-            }
-            .frame(width: 135, alignment: .trailing)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 14)
