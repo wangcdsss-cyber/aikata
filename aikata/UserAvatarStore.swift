@@ -49,7 +49,9 @@ final class UserAvatarStore: ObservableObject {
                     (data["profileImage"] as? String) ??
                     ""
                 let name = (data["name"] as? String) ?? ""
-                let age = data["age"] as? Int
+                let age =
+                    (data["age"] as? Int) ??
+                    Int((data["age"] as? String) ?? "")
                 let occupation =
                     (data["occupation"] as? String) ??
                     (data["job"] as? String) ??

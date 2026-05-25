@@ -294,6 +294,28 @@ struct PostListView: View {
             let fallbackName = post.userName.trimmingCharacters(in: .whitespacesAndNewlines)
             return storeName.isEmpty ? fallbackName : storeName
         }
+
+        private var resolvedAgeText: String {
+            if let age = avatarStore.age(userId: post.userId) ?? post.userAge, age > 0 {
+                return "\(age)歳"
+            }
+            return "年齢非公開"
+        }
+
+        private var resolvedJobText: String {
+            let storeJob = avatarStore.occupation(userId: post.userId)?
+                .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            if !storeJob.isEmpty { return storeJob }
+            let fallback = (post.userJob ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            return fallback.isEmpty ? "職業非公開" : fallback
+        }
+
+        private var resolvedWorkLocationText: String? {
+            let store = avatarStore.workLocation(userId: post.userId)?
+                .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            if store.isEmpty { return nil }
+            return store
+        }
         
         var body: some View {
             let horizontalPadding: CGFloat = screenWidth <= 375 ? 12 : 16
@@ -346,9 +368,19 @@ struct PostListView: View {
                         }
                     }
                     
-                    Text("\(post.userAge.map { "\($0)歳" } ?? "年齢非公開")・\(post.userJob ?? "職業非公開")")
+                    Text(
+                        {
+                            var parts: [String] = [resolvedAgeText, resolvedJobText]
+                            if let location = resolvedWorkLocationText {
+                                parts.append(location)
+                            }
+                            return parts.joined(separator: "・")
+                        }()
+                    )
                         .font(.system(size: 14, weight: .regular))
                         .foregroundColor(Color(hex: "#CCCCCC"))
+                        .lineLimit(1)
+                        .truncationMode(.tail)
                 }
             }
             
