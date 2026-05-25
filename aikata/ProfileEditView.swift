@@ -12,6 +12,7 @@ struct ProfileEditView: View {
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var selectedImage: UIImage?
     @State private var profileImageUrl: String
+    @State private var nickname: String
     @State private var mbti: String
     @State private var workLocation: String
     @State private var occupation: String
@@ -41,6 +42,7 @@ struct ProfileEditView: View {
     init(user: AppUser) {
         self.user = user
         _profileImageUrl = State(initialValue: user.profileImageUrl ?? "")
+        _nickname = State(initialValue: user.name)
         _mbti = State(initialValue: Self.mbtiDisplayValue(for: user.mbti ?? ""))
         _workLocation = State(initialValue: user.workplace ?? user.residence ?? "")
         _occupation = State(initialValue: user.job ?? "")
@@ -60,6 +62,7 @@ struct ProfileEditView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     profileImageEditor
+                    nicknameEditor
                     basicSelectionSection
                     introSection
                     detailsSection
@@ -210,6 +213,49 @@ struct ProfileEditView: View {
                         .overlay(
                             Capsule().stroke(Color.white.opacity(0.4), lineWidth: 1)
                         )
+                }
+            }
+        }
+    }
+
+    private var nicknameEditor: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("※アイコンがご自身の写真でない場合、投稿を削除いたします。")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(Color.red.opacity(0.85))
+
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
+                    Text("ニックネーム")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(Color.white.opacity(0.9))
+                    Text("※必須")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(Color.red.opacity(0.85))
+                }
+
+                TextField(
+                    "",
+                    text: $nickname,
+                    prompt: Text("ニックネームを入力").foregroundColor(Color.white.opacity(0.7))
+                )
+                .padding(.horizontal, 12)
+                .padding(.vertical, 14)
+                .background(Color.black)
+                .foregroundColor(.white)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 0)
+                        .stroke(Color.white.opacity(0.35), lineWidth: 1)
+                )
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled(true)
+                .onChange(of: nickname) { _, newValue in
+                    let trimmedNewlines = newValue.replacingOccurrences(of: "\n", with: "")
+                    if trimmedNewlines.count > Self.nicknameMaxLength {
+                        nickname = String(trimmedNewlines.prefix(Self.nicknameMaxLength))
+                    } else if trimmedNewlines != newValue {
+                        nickname = trimmedNewlines
+                    }
                 }
             }
         }
@@ -374,6 +420,7 @@ struct ProfileEditView: View {
     private var hasChanges: Bool {
         selectedImage != nil ||
         normalize(profileImageUrl) != normalize(user.profileImageUrl ?? "") ||
+        normalize(nickname) != normalize(user.name) ||
         normalize(mbti) != normalize(user.mbti ?? "") ||
         normalize(workLocation) != normalize(user.workplace ?? user.residence ?? "") ||
         normalize(occupation) != normalize(user.job ?? "") ||
@@ -390,10 +437,32 @@ struct ProfileEditView: View {
         value.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
     }
 
+    private static let nicknameMaxLength = 20
+
+    private static func validateNickname(_ nickname: String) -> String? {
+        let trimmed = nickname.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            return "ニックネームを入力してください。"
+        }
+        if trimmed.count > nicknameMaxLength {
+            return "ニックネームは\(nicknameMaxLength)文字以内で入力してください。"
+        }
+        let pattern = #"^[\p{L}\p{N}ぁ-ゔァ-ヴー々〆〤一-龯ー・_\-]+$"#
+        if trimmed.range(of: pattern, options: [.regularExpression]) == nil {
+            return "ニックネームに使用できない文字が含まれています。"
+        }
+        return nil
+    }
+
     @MainActor
     private func saveProfile() async {
         guard let userId = user.id else {
             errorMessage = "ユーザーIDが見つかりません。"
+            showErrorAlert = true
+            return
+        }
+        if let nicknameError = Self.validateNickname(nickname) {
+            errorMessage = nicknameError
             showErrorAlert = true
             return
         }
@@ -460,6 +529,7 @@ struct ProfileEditView: View {
 
             try await firestoreService.saveUserProfile(
                 userId: userId,
+                name: normalize(nickname),
                 profileImageURL: nextImageURL,
                 mbti: mbti,
                 workLocation: workLocation,
@@ -472,12 +542,17 @@ struct ProfileEditView: View {
                 birthplace: birthplace,
                 frequentDrinkingArea: frequentDrinkingAreaStoredValue
             )
-            if normalize(nextImageURL) != normalize(user.profileImageUrl ?? "") {
-                try await firestoreService.propagateProfileImageUpdate(userId: userId, profileImageURL: nextImageURL)
+            if normalize(nextImageURL) != normalize(user.profileImageUrl ?? "") || normalize(nickname) != normalize(user.name) {
+                try await firestoreService.propagateUserPublicProfileUpdate(
+                    userId: userId,
+                    name: normalize(nickname),
+                    profileImageURL: nextImageURL
+                )
             }
 
             var updated = user
             updated.profileImageUrl = nextImageURL.isEmpty ? nil : nextImageURL
+            updated.name = normalize(nickname)
             updated.mbti = normalize(mbti)
             updated.workplace = normalize(workLocation)
             updated.job = normalize(occupation)
@@ -496,6 +571,14 @@ struct ProfileEditView: View {
                 userInfo: [
                     "userId": userId,
                     "profileImageUrl": nextImageURL
+                ]
+            )
+            NotificationCenter.default.post(
+                name: .userNameDidUpdate,
+                object: nil,
+                userInfo: [
+                    "userId": userId,
+                    "name": normalize(nickname)
                 ]
             )
             dismiss()

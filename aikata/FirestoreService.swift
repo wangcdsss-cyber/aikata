@@ -245,6 +245,7 @@ class FirestoreService: ObservableObject {
 
     func saveUserProfile(
         userId: String,
+        name: String,
         profileImageURL: String?,
         mbti: String,
         workLocation: String,
@@ -263,6 +264,7 @@ class FirestoreService: ObservableObject {
         }
 
         let data: [String: Any] = [
+            "name": name,
             "profileImage": profileImageURL ?? "",
             "mbti": mbti,
             "workLocation": workLocation,
@@ -280,12 +282,12 @@ class FirestoreService: ObservableObject {
         try await db.collection("users").document(userId).setData(data, merge: true)
     }
 
-    func propagateProfileImageUpdate(userId: String, profileImageURL: String) async throws {
-        try await updatePostProfileImages(userId: userId, profileImageURL: profileImageURL)
-        try await updateChatRoomProfileImages(userId: userId, profileImageURL: profileImageURL)
+    func propagateUserPublicProfileUpdate(userId: String, name: String, profileImageURL: String) async throws {
+        try await updatePostUserPresentation(userId: userId, name: name, profileImageURL: profileImageURL)
+        try await updateChatRoomUserPresentation(userId: userId, name: name, profileImageURL: profileImageURL)
     }
 
-    private func updatePostProfileImages(userId: String, profileImageURL: String) async throws {
+    private func updatePostUserPresentation(userId: String, name: String, profileImageURL: String) async throws {
         var lastDoc: DocumentSnapshot?
         while true {
             var query = db.collection("posts")
@@ -299,7 +301,13 @@ class FirestoreService: ObservableObject {
             if snapshot.documents.isEmpty { break }
             let batch = db.batch()
             snapshot.documents.forEach { doc in
-                batch.updateData(["userProfileImageUrl": profileImageURL], forDocument: doc.reference)
+                batch.updateData(
+                    [
+                        "userProfileImageUrl": profileImageURL,
+                        "userName": name
+                    ],
+                    forDocument: doc.reference
+                )
             }
             try await batch.commit()
             lastDoc = snapshot.documents.last
@@ -307,7 +315,7 @@ class FirestoreService: ObservableObject {
         }
     }
 
-    private func updateChatRoomProfileImages(userId: String, profileImageURL: String) async throws {
+    private func updateChatRoomUserPresentation(userId: String, name: String, profileImageURL: String) async throws {
         let snapshot = try await db.collection("chatRooms")
             .whereField("members", arrayContains: userId)
             .getDocuments()
@@ -320,8 +328,15 @@ class FirestoreService: ObservableObject {
             let batch = db.batch()
             for i in startIndex..<endIndex {
                 let ref = docs[i].reference
-                let path = FieldPath(["memberImageUrls", userId])
-                batch.updateData([path: profileImageURL], forDocument: ref)
+                let imagePath = FieldPath(["memberImageUrls", userId])
+                let namePath = FieldPath(["memberNames", userId])
+                batch.updateData(
+                    [
+                        imagePath: profileImageURL,
+                        namePath: name
+                    ],
+                    forDocument: ref
+                )
             }
             try await batch.commit()
             startIndex = endIndex

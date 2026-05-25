@@ -107,6 +107,19 @@ struct PostListView: View {
                         else { return }
                         firestoreService.posts = AvatarSync.updatedPosts(firestoreService.posts, userId: userId, profileImageUrl: profileImageUrl)
                     }
+                    .onReceive(NotificationCenter.default.publisher(for: .userNameDidUpdate)) { notification in
+                        guard
+                            let userInfo = notification.userInfo,
+                            let userId = userInfo["userId"] as? String,
+                            let name = userInfo["name"] as? String
+                        else { return }
+                        firestoreService.posts = firestoreService.posts.map { post in
+                            guard post.userId == userId else { return post }
+                            var next = post
+                            next.userName = name
+                            return next
+                        }
+                    }
                     .sheet(item: $selectedPostToReport) { post in
                         if let currentUser = authManager.currentUser {
                             ReportView(
@@ -274,6 +287,13 @@ struct PostListView: View {
             if urlString.isEmpty { return nil }
             return URL(string: urlString)
         }
+
+        private var resolvedDisplayName: String {
+            let storeName = avatarStore.name(userId: post.userId)?
+                .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let fallbackName = post.userName.trimmingCharacters(in: .whitespacesAndNewlines)
+            return storeName.isEmpty ? fallbackName : storeName
+        }
         
         var body: some View {
             let horizontalPadding: CGFloat = screenWidth <= 375 ? 12 : 16
@@ -298,7 +318,7 @@ struct PostListView: View {
                 // User Info
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(alignment: .top) {
-                        Text(post.userName)
+                        Text(resolvedDisplayName)
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundColor(.white)
                             .lineSpacing(8) // Approx line height 24

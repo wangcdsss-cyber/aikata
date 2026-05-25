@@ -12,6 +12,7 @@ struct PostDetailView: View {
     }
     
     var body: some View {
+        let displayedName = avatarStore.name(userId: currentPost.userId) ?? currentPost.userName
         ZStack {
             Color.black.edgesIgnoringSafeArea(.all)
             
@@ -35,7 +36,7 @@ struct PostDetailView: View {
                         // User Info
                         VStack(alignment: .leading, spacing: 4) {
                             HStack {
-                                Text(currentPost.userName)
+                                Text(displayedName)
                                     .font(.system(size: 18, weight: .bold))
                                     .foregroundColor(.white)
                                 Spacer()
@@ -112,6 +113,15 @@ struct PostDetailView: View {
             else { return }
             guard currentPost.userId == userId else { return }
             currentPost.userProfileImageUrl = profileImageUrl
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .userNameDidUpdate)) { notification in
+            guard
+                let userInfo = notification.userInfo,
+                let userId = userInfo["userId"] as? String,
+                let name = userInfo["name"] as? String
+            else { return }
+            guard currentPost.userId == userId else { return }
+            currentPost.userName = name
         }
     }
 }

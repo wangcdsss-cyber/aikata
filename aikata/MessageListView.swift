@@ -107,6 +107,19 @@ struct MessageListView: View {
                 else { return }
                 chatRooms = AvatarSync.updatedChatRooms(chatRooms, userId: userId, profileImageUrl: profileImageUrl)
             }
+            .onReceive(NotificationCenter.default.publisher(for: .userNameDidUpdate)) { notification in
+                guard
+                    let userInfo = notification.userInfo,
+                    let userId = userInfo["userId"] as? String,
+                    let name = userInfo["name"] as? String
+                else { return }
+                chatRooms = chatRooms.map { room in
+                    guard room.memberNames[userId] != nil else { return room }
+                    var next = room
+                    next.memberNames[userId] = name
+                    return next
+                }
+            }
         }
         .onDisappear {
             chatRoomsListener?.remove()
@@ -239,6 +252,7 @@ private struct ChatRoomRow: View {
 
     var body: some View {
         let partnerId = room.partnerId(currentUserId: currentUserId)
+        let displayedName = avatarStore.name(userId: partnerId) ?? room.partnerName(currentUserId: currentUserId)
         HStack(spacing: 10) {
             AsyncImage(url: URL(string: avatarStore.profileImageUrl(userId: partnerId) ?? room.partnerImageUrl(currentUserId: currentUserId) ?? "")) { image in
                 image.resizable().aspectRatio(contentMode: .fill)
@@ -251,7 +265,7 @@ private struct ChatRoomRow: View {
             .clipShape(Circle())
 
             VStack(alignment: .leading, spacing: 6) {
-                Text(room.partnerName(currentUserId: currentUserId))
+                Text(displayedName)
                     .font(.system(size: 17, weight: .semibold))
                     .foregroundColor(.white)
                     .lineLimit(1)

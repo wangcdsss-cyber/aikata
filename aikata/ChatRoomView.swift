@@ -51,6 +51,13 @@ struct ChatRoomView: View {
         return avatarStore.profileImageUrl(userId: chatPartnerId)
     }
 
+    private var displayedChatPartnerName: String {
+        let storeName = avatarStore.name(userId: chatPartnerId)?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !storeName.isEmpty { return storeName }
+        return chatPartnerName
+    }
+
     init(
         currentUserId: String,
         chatPartnerId: String,
@@ -194,7 +201,7 @@ struct ChatRoomView: View {
                     .frame(width: 34, height: 34)
                     .clipShape(Circle())
 
-                    Text(chatPartnerName)
+                    Text(displayedChatPartnerName)
                         .foregroundColor(.white)
                         .font(.system(size: 20, weight: .semibold))
                 }
@@ -401,7 +408,7 @@ struct ChatRoomView: View {
                 text: textToSend,
                 senderName: currentUser?.name,
                 senderImageUrl: currentUser?.profileImageUrl,
-                receiverName: chatPartnerName,
+                receiverName: displayedChatPartnerName,
                 receiverImageUrl: displayedChatPartnerImageUrl
             )
             let generator = UIImpactFeedbackGenerator(style: .light)
@@ -532,7 +539,7 @@ struct ChatRoomView: View {
                 images: uiImages,
                 senderName: currentUser?.name,
                 senderImageUrl: currentUser?.profileImageUrl,
-                receiverName: chatPartnerName,
+                receiverName: displayedChatPartnerName,
                 receiverImageUrl: displayedChatPartnerImageUrl
             )
             let generator = UIImpactFeedbackGenerator(style: .light)
