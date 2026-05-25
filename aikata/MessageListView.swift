@@ -253,6 +253,14 @@ private struct ChatRoomRow: View {
     var body: some View {
         let partnerId = room.partnerId(currentUserId: currentUserId)
         let displayedName = avatarStore.name(userId: partnerId) ?? room.partnerName(currentUserId: currentUserId)
+        let ageText = avatarStore.age(userId: partnerId).map { "\($0)歳" }
+        let occupationText = avatarStore.occupation(userId: partnerId)
+        let workLocationText = avatarStore.workLocation(userId: partnerId)
+        let profileParts = [ageText, occupationText, workLocationText].compactMap { value -> String? in
+            let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            return trimmed.isEmpty ? nil : trimmed
+        }
+        let profileLine = profileParts.joined(separator: "  ")
         HStack(spacing: 10) {
             AsyncImage(url: URL(string: avatarStore.profileImageUrl(userId: partnerId) ?? room.partnerImageUrl(currentUserId: currentUserId) ?? "")) { image in
                 image.resizable().aspectRatio(contentMode: .fill)
@@ -271,6 +279,15 @@ private struct ChatRoomRow: View {
                     .lineLimit(1)
                     .truncationMode(.tail)
                     .frame(maxWidth: .infinity, alignment: .leading)
+
+                if !profileLine.isEmpty {
+                    Text(profileLine)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(.white)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
 
                 Text(room.previewText)
                     .font(.system(size: 14))
