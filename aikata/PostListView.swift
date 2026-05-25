@@ -60,7 +60,6 @@ struct PostListView: View {
                     .onAppear {
                         // Set global appearances for this view
                         UIRefreshControl.appearance().tintColor = UIColor.white
-                        UINavigationBar.appearance().titleTextAttributes = [.foregroundColor: UIColor.white]
                         
                         if let user = authManager.currentUser {
                             Task {
