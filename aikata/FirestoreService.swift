@@ -243,10 +243,57 @@ class FirestoreService: ObservableObject {
             return user
         }
         let data = snapshot.data() ?? [:]
+
         let name = (data["name"] as? String) ?? "Unknown"
         let genderRaw = (data["gender"] as? String) ?? Gender.male.rawValue
         let gender = Gender(rawValue: genderRaw) ?? .male
-        return AppUser(id: snapshot.documentID, name: name, gender: gender, createdAt: Date())
+        let createdAt = (data["createdAt"] as? Timestamp)?.dateValue() ?? Date()
+
+        let profileImageUrl =
+            (data["profileImageUrl"] as? String) ??
+            (data["profileImage"] as? String)
+
+        let age = (data["age"] as? Int) ?? Int((data["age"] as? String) ?? "")
+
+        let job =
+            (data["job"] as? String) ??
+            (data["occupation"] as? String)
+
+        let workplace =
+            (data["workplace"] as? String) ??
+            (data["workLocation"] as? String)
+
+        let residence = data["residence"] as? String
+        let selfIntroduction = data["selfIntroduction"] as? String
+        let education = data["education"] as? String
+        let height = data["height"] as? String
+        let bodyType = data["bodyType"] as? String
+        let annualIncome = data["annualIncome"] as? String
+        let mbti = data["mbti"] as? String
+        let birthplace = data["birthplace"] as? String
+        let frequentDrinkingArea = data["frequentDrinkingArea"] as? String
+
+        var user = AppUser(
+            id: snapshot.documentID,
+            name: name,
+            gender: gender,
+            profileImageUrl: profileImageUrl,
+            age: age,
+            job: job,
+            residence: residence,
+            selfIntroduction: selfIntroduction,
+            education: education,
+            height: height,
+            bodyType: bodyType,
+            annualIncome: annualIncome,
+            mbti: mbti,
+            birthplace: birthplace,
+            workplace: workplace,
+            frequentDrinkingArea: frequentDrinkingArea,
+            createdAt: createdAt
+        )
+        user.id = snapshot.documentID
+        return user
     }
 
     func uploadProfileImage(userId: String, image: UIImage) async throws -> String {
