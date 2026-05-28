@@ -18,7 +18,7 @@ struct MessageListView: View {
     @State private var selectedRoomToReport: ChatRoomSummary? = nil
     @State private var alertMessage: String? = nil
     @State private var chatRoomsListener: ListenerRegistration? = nil
-    @State private var activeChatRoom: ChatRoomSummary? = nil
+    @State private var activeChatRoom: ChatRoomRoute? = nil
     @State private var activeProfile: UserProfileRoute? = nil
 
     private let pageSize = 20
@@ -53,7 +53,16 @@ struct MessageListView: View {
                                     room: room,
                                     currentUserId: authManager.currentUser?.id ?? "",
                                     avatarStore: avatarStore,
-                                    onRowTapped: { activeChatRoom = room },
+                                    onRowTapped: {
+                                        let currentUserId = authManager.currentUser?.id ?? ""
+                                        let partnerId = room.partnerId(currentUserId: currentUserId)
+                                        activeChatRoom = ChatRoomRoute(
+                                            id: room.id,
+                                            partnerId: partnerId,
+                                            partnerName: room.partnerName(currentUserId: currentUserId),
+                                            partnerImageUrl: room.partnerImageUrl(currentUserId: currentUserId)
+                                        )
+                                    },
                                     onAvatarTapped: {
                                         let partnerId = room.partnerId(currentUserId: authManager.currentUser?.id ?? "")
                                         activeProfile = UserProfileRoute(id: partnerId)
@@ -118,9 +127,9 @@ struct MessageListView: View {
         .navigationDestination(item: $activeChatRoom) { room in
             ChatRoomView(
                 currentUserId: authManager.currentUser?.id ?? "",
-                chatPartnerId: room.partnerId(currentUserId: authManager.currentUser?.id ?? ""),
-                chatPartnerName: room.partnerName(currentUserId: authManager.currentUser?.id ?? ""),
-                chatPartnerImageUrl: room.partnerImageUrl(currentUserId: authManager.currentUser?.id ?? ""),
+                chatPartnerId: room.partnerId,
+                chatPartnerName: room.partnerName,
+                chatPartnerImageUrl: room.partnerImageUrl,
                 sourcePostId: room.id,
                 currentUser: authManager.currentUser,
                 isChatRoomPresented: .constant(false)
@@ -253,6 +262,13 @@ struct MessageListView: View {
 
 private struct UserProfileRoute: Identifiable, Hashable {
     let id: String
+}
+
+private struct ChatRoomRoute: Identifiable, Hashable {
+    let id: String
+    let partnerId: String
+    let partnerName: String
+    let partnerImageUrl: String?
 }
 
 private struct ChatRoomRow: View {
