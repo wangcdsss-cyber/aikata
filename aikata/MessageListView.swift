@@ -18,11 +18,13 @@ struct MessageListView: View {
     @State private var selectedRoomToReport: ChatRoomSummary? = nil
     @State private var alertMessage: String? = nil
     @State private var chatRoomsListener: ListenerRegistration? = nil
+    @State private var activeChatRoom: ChatRoomSummary? = nil
+    @State private var activeProfile: UserProfileRoute? = nil
 
     private let pageSize = 20
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ZStack {
                 Color.black.ignoresSafeArea()
 
@@ -47,26 +49,18 @@ struct MessageListView: View {
                     ScrollView {
                         LazyVStack(spacing: 0) {
                             ForEach(Array(chatRooms.enumerated()), id: \.element.id) { index, room in
-                                NavigationLink(
-                                    destination: ChatRoomView(
-                                        currentUserId: authManager.currentUser?.id ?? "",
-                                        chatPartnerId: room.partnerId(currentUserId: authManager.currentUser?.id ?? ""),
-                                        chatPartnerName: room.partnerName(currentUserId: authManager.currentUser?.id ?? ""),
-                                        chatPartnerImageUrl: room.partnerImageUrl(currentUserId: authManager.currentUser?.id ?? ""),
-                                        sourcePostId: room.id,
-                                        currentUser: authManager.currentUser,
-                                        isChatRoomPresented: .constant(false)
-                                    )
-                                ) {
-                                    ChatRoomRow(
-                                        room: room,
-                                        currentUserId: authManager.currentUser?.id ?? "",
-                                        avatarStore: avatarStore,
-                                        onDeleteTapped: { roomToDelete = room },
-                                        onReportTapped: { selectedRoomToReport = room }
-                                    )
-                                }
-                                .buttonStyle(.plain)
+                                ChatRoomRow(
+                                    room: room,
+                                    currentUserId: authManager.currentUser?.id ?? "",
+                                    avatarStore: avatarStore,
+                                    onRowTapped: { activeChatRoom = room },
+                                    onAvatarTapped: {
+                                        let partnerId = room.partnerId(currentUserId: authManager.currentUser?.id ?? "")
+                                        activeProfile = UserProfileRoute(id: partnerId)
+                                    },
+                                    onDeleteTapped: { roomToDelete = room },
+                                    onReportTapped: { selectedRoomToReport = room }
+                                )
                                 .onAppear {
                                     if index == chatRooms.count - 1 {
                                         Task { await loadMoreIfNeeded() }
@@ -120,6 +114,20 @@ struct MessageListView: View {
                     return next
                 }
             }
+        }
+        .navigationDestination(item: $activeChatRoom) { room in
+            ChatRoomView(
+                currentUserId: authManager.currentUser?.id ?? "",
+                chatPartnerId: room.partnerId(currentUserId: authManager.currentUser?.id ?? ""),
+                chatPartnerName: room.partnerName(currentUserId: authManager.currentUser?.id ?? ""),
+                chatPartnerImageUrl: room.partnerImageUrl(currentUserId: authManager.currentUser?.id ?? ""),
+                sourcePostId: room.id,
+                currentUser: authManager.currentUser,
+                isChatRoomPresented: .constant(false)
+            )
+        }
+        .navigationDestination(item: $activeProfile) { route in
+            UserProfileView(userId: route.id)
         }
         .onDisappear {
             chatRoomsListener?.remove()
@@ -243,10 +251,16 @@ struct MessageListView: View {
     }
 }
 
+private struct UserProfileRoute: Identifiable, Hashable {
+    let id: String
+}
+
 private struct ChatRoomRow: View {
     let room: ChatRoomSummary
     let currentUserId: String
     let avatarStore: UserAvatarStore
+    let onRowTapped: () -> Void
+    let onAvatarTapped: () -> Void
     let onDeleteTapped: () -> Void
     let onReportTapped: () -> Void
 
@@ -262,15 +276,18 @@ private struct ChatRoomRow: View {
         }
         let profileLine = profileParts.joined(separator: "  ")
         HStack(spacing: 10) {
-            AsyncImage(url: URL(string: avatarStore.profileImageUrl(userId: partnerId) ?? room.partnerImageUrl(currentUserId: currentUserId) ?? "")) { image in
-                image.resizable().aspectRatio(contentMode: .fill)
-            } placeholder: {
-                Image(systemName: "person.circle.fill")
-                    .resizable()
-                    .foregroundColor(Color.gray.opacity(0.6))
+            Button(action: onAvatarTapped) {
+                AsyncImage(url: URL(string: avatarStore.profileImageUrl(userId: partnerId) ?? room.partnerImageUrl(currentUserId: currentUserId) ?? "")) { image in
+                    image.resizable().aspectRatio(contentMode: .fill)
+                } placeholder: {
+                    Image(systemName: "person.circle.fill")
+                        .resizable()
+                        .foregroundColor(Color.gray.opacity(0.6))
+                }
+                .frame(width: 48, height: 48)
+                .clipShape(Circle())
             }
-            .frame(width: 48, height: 48)
-            .clipShape(Circle())
+            .buttonStyle(.plain)
 
             VStack(alignment: .leading, spacing: 6) {
                 HStack(alignment: .firstTextBaseline, spacing: 10) {
@@ -317,6 +334,8 @@ private struct ChatRoomRow: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+            .onTapGesture(perform: onRowTapped)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 14)

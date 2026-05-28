@@ -324,17 +324,22 @@ struct PostListView: View {
                 // Header: Avatar + User Info + Time
                 HStack(alignment: .center, spacing: 12) {
                     // Avatar
-                    AsyncImage(url: resolvedAvatarUrl) { image in
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                    } placeholder: {
-                        Image(systemName: "person.circle.fill")
-                            .resizable()
-                            .foregroundColor(Color(hex: "#E0E0E0"))
+                    NavigationLink {
+                        UserProfileView(userId: post.userId)
+                    } label: {
+                        AsyncImage(url: resolvedAvatarUrl) { image in
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                        } placeholder: {
+                            Image(systemName: "person.circle.fill")
+                                .resizable()
+                                .foregroundColor(Color(hex: "#E0E0E0"))
+                        }
+                        .frame(width: avatarSize, height: avatarSize)
+                        .clipShape(Circle())
                     }
-                    .frame(width: avatarSize, height: avatarSize)
-                    .clipShape(Circle())
+                    .buttonStyle(.plain)
                 
                 // User Info
                 VStack(alignment: .leading, spacing: 4) {

@@ -229,6 +229,26 @@ class FirestoreService: ObservableObject {
         try db.collection("users").document(id).setData(from: user)
     }
 
+    func fetchUser(userId: String) async throws -> AppUser {
+        let trimmed = userId.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            throw NSError(domain: "UserProfile", code: 400, userInfo: [NSLocalizedDescriptionKey: "ユーザーIDが無効です。"])
+        }
+        let snapshot = try await db.collection("users").document(trimmed).getDocument()
+        guard snapshot.exists else {
+            throw NSError(domain: "UserProfile", code: 404, userInfo: [NSLocalizedDescriptionKey: "ユーザーが見つかりません。"])
+        }
+        if var user = try? snapshot.data(as: AppUser.self) {
+            user.id = snapshot.documentID
+            return user
+        }
+        let data = snapshot.data() ?? [:]
+        let name = (data["name"] as? String) ?? "Unknown"
+        let genderRaw = (data["gender"] as? String) ?? Gender.male.rawValue
+        let gender = Gender(rawValue: genderRaw) ?? .male
+        return AppUser(id: snapshot.documentID, name: name, gender: gender, createdAt: Date())
+    }
+
     func uploadProfileImage(userId: String, image: UIImage) async throws -> String {
         guard let data = ChatImageCompressor.compressForUpload(image) else {
             throw NSError(domain: "ProfileImage", code: 2001, userInfo: [NSLocalizedDescriptionKey: "プロフィール画像の圧縮に失敗しました。"])
