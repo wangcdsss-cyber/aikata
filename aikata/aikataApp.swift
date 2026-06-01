@@ -18,6 +18,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
 #endif
         AppAppearance.configure()
         AdMobManager.shared.configureOnLaunch()
+        AdMobManager.shared.requestConsentAndStartAdsIfNeeded()
         return true
     }
 

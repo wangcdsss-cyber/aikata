@@ -4,6 +4,10 @@ import SwiftUI
 import GoogleMobileAds
 #endif
 
+#if canImport(UIKit)
+import UIKit
+#endif
+
 struct AdMobBannerView: View {
     let adUnitId: String
     let verticalPadding: CGFloat
@@ -15,16 +19,7 @@ struct AdMobBannerView: View {
     var body: some View {
 #if canImport(GoogleMobileAds)
         VStack(spacing: 0) {
-            GeometryReader { geo in
-                Color.clear
-                    .onAppear { containerWidth = geo.size.width }
-                    .onChange(of: geo.size.width) { _, newValue in
-                        containerWidth = newValue
-                    }
-            }
-            .frame(height: 0)
-
-            if !hasFailedToLoad, containerWidth > 0 {
+            if containerWidth > 0, !hasFailedToLoad {
                 AdMobBannerRepresentable(
                     adUnitId: adUnitId,
                     width: containerWidth,
@@ -37,6 +32,9 @@ struct AdMobBannerView: View {
         .frame(maxWidth: .infinity)
         .background(Color.black)
         .onAppear {
+            if containerWidth <= 0 {
+                containerWidth = UIScreen.main.bounds.width
+            }
             if hasFailedToLoad {
                 hasFailedToLoad = false
             }
@@ -77,7 +75,9 @@ private struct AdMobBannerRepresentable: UIViewRepresentable {
         let bannerView = BannerView(adSize: adSize)
         bannerView.adUnitID = adUnitId
         bannerView.delegate = context.coordinator
-        bannerView.rootViewController = UIApplication.shared.topMostViewController()
+        if let controller = UIApplication.shared.topMostViewController() {
+            bannerView.rootViewController = controller
+        }
         bannerView.load(Request())
         return bannerView
     }
@@ -86,7 +86,9 @@ private struct AdMobBannerRepresentable: UIViewRepresentable {
         let adSize = currentOrientationAnchoredAdaptiveBanner(width: width)
         if uiView.adSize.size.width != adSize.size.width || uiView.adSize.size.height != adSize.size.height {
             uiView.adSize = adSize
-            uiView.rootViewController = UIApplication.shared.topMostViewController()
+        }
+        if uiView.rootViewController == nil, let controller = UIApplication.shared.topMostViewController() {
+            uiView.rootViewController = controller
             uiView.load(Request())
         }
     }
