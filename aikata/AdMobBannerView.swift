@@ -17,6 +17,7 @@ struct AdMobBannerView: View {
     @State private var retryCount = 0
     @State private var lastErrorText: String? = nil
     @State private var showErrorAlert = false
+    @State private var isWaitingForCallback = false
 
     var body: some View {
 #if canImport(GoogleMobileAds)
@@ -40,15 +41,25 @@ struct AdMobBannerView: View {
                     .contentShape(Rectangle())
                     .onTapGesture {
                         hasFailedToLoad = false
+                        isWaitingForCallback = false
                     }
                 } else {
-                    AdMobBannerRepresentable(
-                        adUnitId: adUnitId,
-                        width: containerWidth,
-                        hasFailedToLoad: $hasFailedToLoad,
-                        lastErrorText: $lastErrorText,
-                        showErrorAlert: $showErrorAlert
-                    )
+                    ZStack {
+                        AdMobBannerRepresentable(
+                            adUnitId: adUnitId,
+                            width: containerWidth,
+                            hasFailedToLoad: $hasFailedToLoad,
+                            lastErrorText: $lastErrorText,
+                            showErrorAlert: $showErrorAlert,
+                            isWaitingForCallback: $isWaitingForCallback
+                        )
+                        if isWaitingForCallback {
+                            Text("読み込み中…（応答待ち）")
+                                .font(.system(size: 11))
+                                .foregroundColor(Color.white.opacity(0.85))
+                                .padding(.horizontal, 12)
+                        }
+                    }
                     .frame(height: bannerHeight(for: containerWidth))
                     .padding(.vertical, verticalPadding)
                 }
@@ -75,7 +86,21 @@ struct AdMobBannerView: View {
             Text(lastErrorText ?? "")
         }
 #else
-        EmptyView()
+        VStack(spacing: 6) {
+            Text("AdMob")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(Color.white.opacity(0.9))
+            Text("GoogleMobileAds がアプリにリンクされていません。（canImport(GoogleMobileAds) = false）")
+                .font(.system(size: 11))
+                .foregroundColor(Color.red.opacity(0.9))
+                .multilineTextAlignment(.center)
+                .lineLimit(3)
+                .padding(.horizontal, 12)
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 50)
+        .padding(.vertical, verticalPadding)
+        .background(Color.black)
 #endif
     }
 
@@ -94,12 +119,14 @@ private struct AdMobBannerRepresentable: UIViewRepresentable {
     @Binding var hasFailedToLoad: Bool
     @Binding var lastErrorText: String?
     @Binding var showErrorAlert: Bool
+    @Binding var isWaitingForCallback: Bool
 
     func makeCoordinator() -> Coordinator {
         Coordinator(
             hasFailedToLoad: $hasFailedToLoad,
             lastErrorText: $lastErrorText,
-            showErrorAlert: $showErrorAlert
+            showErrorAlert: $showErrorAlert,
+            isWaitingForCallback: $isWaitingForCallback
         )
     }
 
@@ -111,6 +138,7 @@ private struct AdMobBannerRepresentable: UIViewRepresentable {
         if let controller = UIApplication.shared.topMostViewController() {
             bannerView.rootViewController = controller
         }
+        context.coordinator.didStartLoading()
         bannerView.load(Request())
         return bannerView
     }
@@ -120,8 +148,12 @@ private struct AdMobBannerRepresentable: UIViewRepresentable {
         if uiView.adSize.size.width != adSize.size.width || uiView.adSize.size.height != adSize.size.height {
             uiView.adSize = adSize
         }
+        if uiView.adUnitID != adUnitId {
+            uiView.adUnitID = adUnitId
+        }
         if uiView.rootViewController == nil, let controller = UIApplication.shared.topMostViewController() {
             uiView.rootViewController = controller
+            context.coordinator.didStartLoading()
             uiView.load(Request())
         }
     }
@@ -130,23 +162,61 @@ private struct AdMobBannerRepresentable: UIViewRepresentable {
         @Binding var hasFailedToLoad: Bool
         @Binding var lastErrorText: String?
         @Binding var showErrorAlert: Bool
+        @Binding var isWaitingForCallback: Bool
 
-        init(hasFailedToLoad: Binding<Bool>, lastErrorText: Binding<String?>, showErrorAlert: Binding<Bool>) {
+        private var didReceiveCallback = false
+        private var timeoutWorkItem: DispatchWorkItem?
+
+        init(hasFailedToLoad: Binding<Bool>, lastErrorText: Binding<String?>, showErrorAlert: Binding<Bool>, isWaitingForCallback: Binding<Bool>) {
             _hasFailedToLoad = hasFailedToLoad
             _lastErrorText = lastErrorText
             _showErrorAlert = showErrorAlert
+            _isWaitingForCallback = isWaitingForCallback
+        }
+
+        func didStartLoading() {
+            DispatchQueue.main.async {
+                self.hasFailedToLoad = false
+                self.isWaitingForCallback = true
+            }
+
+            didReceiveCallback = false
+            timeoutWorkItem?.cancel()
+
+            let workItem = DispatchWorkItem { [weak self] in
+                guard let self else { return }
+                if self.didReceiveCallback { return }
+                DispatchQueue.main.async {
+                    self.lastErrorText = "Timeout (no callback): 12s"
+                    self.hasFailedToLoad = true
+                    self.isWaitingForCallback = false
+                    self.showErrorAlert = true
+                }
+            }
+            timeoutWorkItem = workItem
+            DispatchQueue.main.asyncAfter(deadline: .now() + 12, execute: workItem)
         }
 
         func bannerViewDidReceiveAd(_ bannerView: BannerView) {
-            hasFailedToLoad = false
-            lastErrorText = nil
+            didReceiveCallback = true
+            timeoutWorkItem?.cancel()
+            DispatchQueue.main.async {
+                self.hasFailedToLoad = false
+                self.isWaitingForCallback = false
+                self.lastErrorText = nil
+            }
         }
 
         func bannerView(_ bannerView: BannerView, didFailToReceiveAdWithError error: Error) {
             let nsError = error as NSError
-            lastErrorText = "\(nsError.domain) (\(nsError.code)): \(nsError.localizedDescription)"
-            hasFailedToLoad = true
-            showErrorAlert = true
+            didReceiveCallback = true
+            timeoutWorkItem?.cancel()
+            DispatchQueue.main.async {
+                self.lastErrorText = "\(nsError.domain) (\(nsError.code)): \(nsError.localizedDescription)"
+                self.hasFailedToLoad = true
+                self.isWaitingForCallback = false
+                self.showErrorAlert = true
+            }
         }
     }
 }

@@ -1,6 +1,10 @@
 import Foundation
+#if canImport(FirebaseFirestore)
 import FirebaseFirestore
+#endif
+#if canImport(UIKit)
 import UIKit
+#endif
 
 enum Gender: String, Codable, CaseIterable {
     case male = "男性"
@@ -122,6 +126,7 @@ func makeChatRoomId(userId1: String, userId2: String) -> String {
     [userId1, userId2].sorted().joined(separator: "_")
 }
 
+#if canImport(UIKit)
 enum ChatImageCompressor {
     static func compressForUpload(
         _ image: UIImage,
@@ -155,3 +160,4 @@ enum ChatImageCompressor {
         }
     }
 }
+#endif
