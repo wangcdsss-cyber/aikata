@@ -518,7 +518,7 @@ private struct EmailConfirmationView: View {
 #if canImport(FirebaseAuth)
 private func authErrorMessage(_ error: Error) -> String {
     let nsError = error as NSError
-    if let code = AuthErrorCode.Code(rawValue: nsError.code) {
+    if let code = AuthErrorCode(rawValue: nsError.code) {
         switch code {
         case .tooManyRequests:
             return "送信回数が多すぎます。しばらく待ってから再度お試しください。"
