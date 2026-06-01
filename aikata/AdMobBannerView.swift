@@ -56,7 +56,7 @@ struct AdMobBannerView: View {
 
 #if canImport(GoogleMobileAds)
     private func bannerHeight(for width: CGFloat) -> CGFloat {
-        let size = GADCurrentOrientationAnchoredAdaptiveBannerAdSizeWithWidth(width)
+        let size = currentOrientationAnchoredAdaptiveBanner(width: width)
         return size.size.height
     }
 #endif
@@ -73,21 +73,21 @@ private struct AdMobBannerRepresentable: UIViewRepresentable {
     }
 
     func makeUIView(context: Context) -> BannerView {
-        let adSize = GADCurrentOrientationAnchoredAdaptiveBannerAdSizeWithWidth(width)
+        let adSize = currentOrientationAnchoredAdaptiveBanner(width: width)
         let bannerView = BannerView(adSize: adSize)
         bannerView.adUnitID = adUnitId
         bannerView.delegate = context.coordinator
         bannerView.rootViewController = UIApplication.shared.topMostViewController()
-        bannerView.load(GADRequest())
+        bannerView.load(Request())
         return bannerView
     }
 
     func updateUIView(_ uiView: BannerView, context: Context) {
-        let adSize = GADCurrentOrientationAnchoredAdaptiveBannerAdSizeWithWidth(width)
+        let adSize = currentOrientationAnchoredAdaptiveBanner(width: width)
         if uiView.adSize.size.width != adSize.size.width || uiView.adSize.size.height != adSize.size.height {
             uiView.adSize = adSize
             uiView.rootViewController = UIApplication.shared.topMostViewController()
-            uiView.load(GADRequest())
+            uiView.load(Request())
         }
     }
 

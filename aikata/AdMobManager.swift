@@ -25,7 +25,7 @@ final class AdMobManager: NSObject {
 
     func configureOnLaunch() {
 #if canImport(GoogleMobileAds)
-        GADMobileAds.sharedInstance().requestConfiguration.tagForUnderAgeOfConsent = false
+        MobileAds.shared.requestConfiguration.tagForUnderAgeOfConsent = false
 #endif
     }
 
@@ -35,17 +35,23 @@ final class AdMobManager: NSObject {
 #if canImport(UserMessagingPlatform)
         if !didRequestUmp {
             didRequestUmp = true
-            let parameters = UMPRequestParameters()
-            UMPConsentInformation.sharedInstance.requestConsentInfoUpdate(with: parameters) { [weak self] _ in
+            let parameters = RequestParameters()
+            ConsentInformation.shared.requestConsentInfoUpdate(with: parameters) { [weak self] _ in
                 guard let self else { return }
+#if canImport(UIKit)
                 guard let viewController = UIApplication.shared.topMostViewController() else {
+                    self.requestTrackingIfNeeded()
                     self.startMobileAdsIfNeeded()
                     return
                 }
-                UMPConsentForm.loadAndPresentIfRequired(from: viewController) { [weak self] _ in
+                ConsentForm.loadAndPresentIfRequired(from: viewController) { [weak self] _ in
                     self?.requestTrackingIfNeeded()
                     self?.startMobileAdsIfNeeded()
                 }
+#else
+                self.requestTrackingIfNeeded()
+                self.startMobileAdsIfNeeded()
+#endif
             }
             return
         }
@@ -71,7 +77,7 @@ final class AdMobManager: NSObject {
 #if canImport(GoogleMobileAds)
         if didStartMobileAds { return }
         didStartMobileAds = true
-        GADMobileAds.sharedInstance().start(completionHandler: nil)
+        MobileAds.shared.start()
 #endif
     }
 }
