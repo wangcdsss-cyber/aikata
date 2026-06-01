@@ -72,9 +72,9 @@ private struct AdMobBannerRepresentable: UIViewRepresentable {
         Coordinator(hasFailedToLoad: $hasFailedToLoad)
     }
 
-    func makeUIView(context: Context) -> GADBannerView {
+    func makeUIView(context: Context) -> BannerView {
         let adSize = GADCurrentOrientationAnchoredAdaptiveBannerAdSizeWithWidth(width)
-        let bannerView = GADBannerView(adSize: adSize)
+        let bannerView = BannerView(adSize: adSize)
         bannerView.adUnitID = adUnitId
         bannerView.delegate = context.coordinator
         bannerView.rootViewController = UIApplication.shared.topMostViewController()
@@ -82,7 +82,7 @@ private struct AdMobBannerRepresentable: UIViewRepresentable {
         return bannerView
     }
 
-    func updateUIView(_ uiView: GADBannerView, context: Context) {
+    func updateUIView(_ uiView: BannerView, context: Context) {
         let adSize = GADCurrentOrientationAnchoredAdaptiveBannerAdSizeWithWidth(width)
         if uiView.adSize.size.width != adSize.size.width || uiView.adSize.size.height != adSize.size.height {
             uiView.adSize = adSize
@@ -91,14 +91,14 @@ private struct AdMobBannerRepresentable: UIViewRepresentable {
         }
     }
 
-    final class Coordinator: NSObject, GADBannerViewDelegate {
+    final class Coordinator: NSObject, BannerViewDelegate {
         @Binding var hasFailedToLoad: Bool
 
         init(hasFailedToLoad: Binding<Bool>) {
             _hasFailedToLoad = hasFailedToLoad
         }
 
-        func bannerView(_ bannerView: GADBannerView, didFailToReceiveAdWithError error: Error) {
+        func bannerView(_ bannerView: BannerView, didFailToReceiveAdWithError error: Error) {
             hasFailedToLoad = true
         }
     }
