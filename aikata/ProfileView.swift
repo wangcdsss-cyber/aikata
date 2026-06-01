@@ -72,6 +72,7 @@ struct ProfileView: View {
 
 private struct SettingsRootView: View {
     @EnvironmentObject private var authManager: AuthManager
+    @EnvironmentObject private var themeStore: ThemeStore
     @Environment(\.dismiss) private var dismiss
     @StateObject private var firestoreService = FirestoreService()
 
@@ -109,6 +110,15 @@ private struct SettingsRootView: View {
                             EmailConfirmationView()
                         } label: {
                             SettingsRow(title: "メール確認")
+                        }
+                        .buttonStyle(.plain)
+
+                        SettingsDivider()
+
+                        NavigationLink {
+                            ThemeColorSelectionView()
+                        } label: {
+                            SettingsRow(title: "テーマカラー")
                         }
                         .buttonStyle(.plain)
                     }
@@ -167,7 +177,7 @@ private struct SettingsRootView: View {
                     }) {
                         Image(systemName: "xmark")
                             .font(.system(size: 16, weight: .semibold))
-                            .foregroundColor(Color.orange)
+                            .foregroundColor(themeStore.selectedTheme.primary)
                             .padding(8)
                             .contentShape(Rectangle())
                     }
@@ -177,11 +187,11 @@ private struct SettingsRootView: View {
                 ToolbarItem(placement: .principal) {
                     Text("設定")
                         .font(.system(size: 18, weight: .semibold))
-                        .foregroundColor(Color.orange)
+                        .foregroundColor(themeStore.selectedTheme.primary)
                 }
 #endif
             }
-            .tint(Color.orange)
+            .tint(themeStore.selectedTheme.primary)
 #if canImport(UIKit)
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(Color.white, for: .navigationBar)
@@ -205,6 +215,7 @@ private struct SettingsRootView: View {
 }
 
 private struct NotificationSettingsView: View {
+    @EnvironmentObject private var themeStore: ThemeStore
     @AppStorage("settings_notifications_enabled") private var notificationsEnabled = true
     @AppStorage("settings_notifications_message") private var messageNotifications = true
     @AppStorage("settings_notifications_board") private var boardNotifications = true
@@ -218,7 +229,7 @@ private struct NotificationSettingsView: View {
                         Text("通知を受け取る")
                             .foregroundColor(.black)
                     }
-                    .tint(Color.orange)
+                    .tint(themeStore.selectedTheme.primary)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 12)
 
@@ -228,7 +239,7 @@ private struct NotificationSettingsView: View {
                         Text("メッセージ通知")
                             .foregroundColor(.black)
                     }
-                    .tint(Color.orange)
+                    .tint(themeStore.selectedTheme.primary)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 12)
 
@@ -238,7 +249,7 @@ private struct NotificationSettingsView: View {
                         Text("掲示板通知")
                             .foregroundColor(.black)
                     }
-                    .tint(Color.orange)
+                    .tint(themeStore.selectedTheme.primary)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 12)
                 }
@@ -254,7 +265,7 @@ private struct NotificationSettingsView: View {
                             Text("多め").tag("多め")
                         }
                         .pickerStyle(.menu)
-                        .tint(Color.orange)
+                        .tint(themeStore.selectedTheme.primary)
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 12)
@@ -276,7 +287,7 @@ private struct NotificationSettingsView: View {
         }
         .background(settingsBackground.ignoresSafeArea())
         .navigationTitle("通知設定")
-        .tint(Color.orange)
+        .tint(themeStore.selectedTheme.primary)
 #if canImport(UIKit)
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(Color.white, for: .navigationBar)
@@ -286,7 +297,7 @@ private struct NotificationSettingsView: View {
             ToolbarItem(placement: .principal) {
                 Text("通知設定")
                     .font(.system(size: 18, weight: .semibold))
-                    .foregroundColor(Color.orange)
+                    .foregroundColor(themeStore.selectedTheme.primary)
             }
         }
 #endif
@@ -310,6 +321,7 @@ private struct NotificationSettingsView: View {
 }
 
 private struct EmailConfirmationView: View {
+    @EnvironmentObject private var themeStore: ThemeStore
     @State private var isSending = false
     @State private var isRefreshing = false
     @State private var resendCooldownUntil: Date? = nil
@@ -407,7 +419,7 @@ private struct EmailConfirmationView: View {
         }
         .background(settingsBackground.ignoresSafeArea())
         .navigationTitle("メール確認")
-        .tint(Color.orange)
+        .tint(themeStore.selectedTheme.primary)
         .alert("メッセージ", isPresented: $showMessageAlert) {
             Button("OK", role: .cancel) {}
         } message: {
@@ -422,7 +434,7 @@ private struct EmailConfirmationView: View {
             ToolbarItem(placement: .principal) {
                 Text("メール確認")
                     .font(.system(size: 18, weight: .semibold))
-                    .foregroundColor(Color.orange)
+                    .foregroundColor(themeStore.selectedTheme.primary)
             }
         }
 #endif
@@ -535,6 +547,151 @@ private func authErrorMessage(_ error: Error) -> String {
     return "送信に失敗しました: \(nsError.localizedDescription) (\(nsError.domain) \(nsError.code))"
 }
 #endif
+
+private struct ThemeColorSelectionView: View {
+    @EnvironmentObject private var themeStore: ThemeStore
+    @Environment(\.colorScheme) private var colorScheme
+
+    private let columns: [GridItem] = [
+        GridItem(.flexible(), spacing: 12),
+        GridItem(.flexible(), spacing: 12)
+    ]
+
+    var body: some View {
+        let colors = themeStore.resolvedColors(for: colorScheme)
+
+        ScrollView {
+            VStack(spacing: 16) {
+                SettingsCard {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("表示モード")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.black)
+
+                        Picker("", selection: Binding(get: {
+                            themeStore.appearanceModeRaw
+                        }, set: { raw in
+                            themeStore.appearanceModeRaw = raw
+                        })) {
+                            ForEach(ThemeAppearanceMode.allCases) { mode in
+                                Text(mode.title).tag(mode.rawValue)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .tint(colors.accent)
+                    }
+                    .padding(16)
+                }
+
+                SettingsCard {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("テーマカラー")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.black)
+
+                        LazyVGrid(columns: columns, spacing: 12) {
+                            ForEach(AppThemePreset.all) { preset in
+                                ThemePresetTile(
+                                    preset: preset,
+                                    isSelected: preset.id == themeStore.selectedThemeId
+                                ) {
+                                    themeStore.select(theme: preset)
+                                }
+                            }
+                        }
+                    }
+                    .padding(16)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 18)
+            .frame(maxWidth: 520)
+            .frame(maxWidth: .infinity)
+        }
+        .background(settingsBackground.ignoresSafeArea())
+        .navigationTitle("テーマカラー")
+        .tint(colors.accent)
+#if canImport(UIKit)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(Color.white, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbarColorScheme(.light, for: .navigationBar)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                Text("テーマカラー")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundColor(colors.accent)
+            }
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("リセット") {
+                    themeStore.reset()
+                }
+                .font(.system(size: 14, weight: .semibold))
+            }
+        }
+#else
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("リセット") {
+                    themeStore.reset()
+                }
+            }
+        }
+#endif
+    }
+
+    private var settingsBackground: Color {
+#if canImport(UIKit)
+        return Color(uiColor: .systemGroupedBackground)
+#else
+        return Color.gray.opacity(0.08)
+#endif
+    }
+}
+
+private struct ThemePresetTile: View {
+    let preset: AppThemePreset
+    let isSelected: Bool
+    let onSelect: () -> Void
+
+    var body: some View {
+        Button(action: onSelect) {
+            HStack(spacing: 10) {
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(preset.primary)
+                        .frame(width: 18, height: 18)
+                    Circle()
+                        .fill(preset.secondary)
+                        .frame(width: 18, height: 18)
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(preset.name)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(.black)
+                    Text("主色 / 補助色")
+                        .font(.system(size: 11))
+                        .foregroundColor(Color.black.opacity(0.55))
+                }
+                Spacer(minLength: 0)
+                if isSelected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(preset.primary)
+                } else {
+                    Image(systemName: "circle")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(Color.black.opacity(0.18))
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 12)
+            .background(Color.black.opacity(0.03))
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        }
+        .buttonStyle(.plain)
+    }
+}
 
 private struct TermsOfServiceView: View {
     private let urlString = "https://changeable-pegasus-9b4.notion.site/372404b9a4d58099ba66fffe4472eb96?source=copy_link"

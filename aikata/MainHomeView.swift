@@ -1,6 +1,9 @@
 import SwiftUI
 
 struct MainHomeView: View {
+    @EnvironmentObject private var themeStore: ThemeStore
+    @Environment(\.colorScheme) private var colorScheme
+
     enum Tab {
         case board
         case messages
@@ -76,7 +79,7 @@ struct MainHomeView: View {
                 Text(title)
                     .font(.system(size: 14, weight: .semibold))
             }
-            .foregroundColor(isActive ? .white : Color.white.opacity(0.7))
+            .foregroundColor(isActive ? themeStore.selectedTheme.primary : Color.white.opacity(0.7))
             .frame(width: 120)
         }
     }

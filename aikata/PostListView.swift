@@ -4,6 +4,7 @@ import FirebaseFirestore
 
 struct PostListView: View {
     @EnvironmentObject var authManager: AuthManager
+    @EnvironmentObject private var themeStore: ThemeStore
     @StateObject private var firestoreService = FirestoreService()
     @StateObject private var avatarStore = UserAvatarStore()
     @State private var isShowingCreatePost = false
@@ -144,7 +145,7 @@ struct PostListView: View {
                                     .font(.system(size: 24, weight: .bold))
                                     .foregroundColor(.white)
                                     .frame(width: 56, height: 56)
-                                    .background(Color(hex: "#3182F6").opacity(0.8))
+                                    .background(themeStore.selectedTheme.primary.opacity(0.85))
                                     .clipShape(Circle())
                                     .shadow(color: Color.black.opacity(0.3), radius: 4, x: 0, y: 2)
                             }

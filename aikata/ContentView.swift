@@ -9,6 +9,7 @@ import SwiftUI
 
 struct ContentView: View {
     @StateObject private var authManager = AuthManager()
+    @StateObject private var themeStore = ThemeStore()
 
     var body: some View {
         Group {
@@ -21,9 +22,14 @@ struct ContentView: View {
             }
         }
         .environmentObject(authManager)
+        .environmentObject(themeStore)
+        .preferredColorScheme(themeStore.preferredColorScheme)
+        .tint(themeStore.selectedTheme.primary)
     }
 }
 
-#Preview {
-    ContentView()
+struct ContentView_Previews: PreviewProvider {
+    static var previews: some View {
+        ContentView()
+    }
 }
