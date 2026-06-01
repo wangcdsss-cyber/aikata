@@ -564,27 +564,6 @@ private struct ThemeColorSelectionView: View {
             VStack(spacing: 16) {
                 SettingsCard {
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("表示モード")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundColor(.black)
-
-                        Picker("", selection: Binding(get: {
-                            themeStore.appearanceModeRaw
-                        }, set: { raw in
-                            themeStore.appearanceModeRaw = raw
-                        })) {
-                            ForEach(ThemeAppearanceMode.allCases) { mode in
-                                Text(mode.title).tag(mode.rawValue)
-                            }
-                        }
-                        .pickerStyle(.segmented)
-                        .tint(colors.accent)
-                    }
-                    .padding(16)
-                }
-
-                SettingsCard {
-                    VStack(alignment: .leading, spacing: 12) {
                         Text("テーマカラー")
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundColor(.black)
@@ -669,9 +648,6 @@ private struct ThemePresetTile: View {
                     Text(preset.name)
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(.black)
-                    Text("主色 / 補助色")
-                        .font(.system(size: 11))
-                        .foregroundColor(Color.black.opacity(0.55))
                 }
                 Spacer(minLength: 0)
                 if isSelected {
