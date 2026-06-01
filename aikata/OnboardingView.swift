@@ -24,89 +24,93 @@ struct OnboardingView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 18) {
-                    VStack(spacing: 8) {
-                        Text("Aikata")
-                            .font(.system(size: 30, weight: .bold))
-                            .foregroundColor(.black)
-                            .padding(.top, 14)
+            GeometryReader { proxy in
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 0) {
+                        VStack(spacing: 6) {
+                            Text("Aikata")
+                                .font(.system(size: 42, weight: .bold))
+                                .foregroundColor(.black)
+                                .padding(.top, 26)
 
-                        Text("趣味友アプリ")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(Color.black.opacity(0.55))
-                    }
-                    .frame(maxWidth: .infinity)
+                            Text("趣味友アプリ")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundColor(Color.black.opacity(0.55))
+                        }
+                        .frame(maxWidth: .infinity)
 
-                    VStack(spacing: 12) {
-                        SettingsCard {
-                            VStack(alignment: .leading, spacing: 10) {
-                                Text("初めて使う方")
-                                    .font(.system(size: 16, weight: .semibold))
-                                    .foregroundColor(.black)
-                                    .padding(.horizontal, 16)
-                                    .padding(.top, 14)
+                        Spacer(minLength: max(24, proxy.size.height * 0.18))
 
-                                Button(action: {
-                                    showLegalDialog = true
-                                }) {
-                                    Text("利用契約とプライバシーポリシーを確認")
-                                        .font(.system(size: 13, weight: .semibold))
-                                        .foregroundColor(Color.blue)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                        .padding(.horizontal, 16)
-                                }
-                                .buttonStyle(.plain)
-
-                                Button(action: {
-                                    showSignUp = true
-                                }) {
-                                    Text("同意して今すぐ始める")
+                        VStack(spacing: 12) {
+                            SettingsCard {
+                                VStack(alignment: .leading, spacing: 10) {
+                                    Text("初めて使う方")
                                         .font(.system(size: 16, weight: .semibold))
-                                        .foregroundColor(.white)
-                                        .frame(maxWidth: .infinity)
-                                        .padding(.vertical, 14)
-                                        .background(Color(red: 0.98, green: 0.38, blue: 0.43))
-                                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                        .foregroundColor(.black)
                                         .padding(.horizontal, 16)
-                                        .padding(.bottom, 14)
+                                        .padding(.top, 14)
+
+                                    Button(action: {
+                                        showLegalDialog = true
+                                    }) {
+                                        Text("利用契約とプライバシーポリシーを確認")
+                                            .font(.system(size: 13, weight: .semibold))
+                                            .foregroundColor(Color.blue)
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                            .padding(.horizontal, 16)
+                                    }
+                                    .buttonStyle(.plain)
+
+                                    Button(action: {
+                                        showSignUp = true
+                                    }) {
+                                        Text("同意して今すぐ始める")
+                                            .font(.system(size: 16, weight: .semibold))
+                                            .foregroundColor(.white)
+                                            .frame(maxWidth: .infinity)
+                                            .padding(.vertical, 14)
+                                            .background(Color(red: 0.98, green: 0.38, blue: 0.43))
+                                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                            .padding(.horizontal, 16)
+                                            .padding(.bottom, 14)
+                                    }
+                                    .buttonStyle(PressedScaleButtonStyle())
                                 }
-                                .buttonStyle(PressedScaleButtonStyle())
+                            }
+
+                            SettingsCard {
+                                VStack(alignment: .leading, spacing: 10) {
+                                    Text("すでにアカウントをお持ちの方")
+                                        .font(.system(size: 16, weight: .semibold))
+                                        .foregroundColor(.black)
+                                        .padding(.horizontal, 16)
+                                        .padding(.top, 14)
+
+                                    Button(action: {
+                                        showSignIn = true
+                                    }) {
+                                        Text("お持ちのアカウントでログイン")
+                                            .font(.system(size: 16, weight: .semibold))
+                                            .foregroundColor(Color.blue)
+                                            .frame(maxWidth: .infinity)
+                                            .padding(.vertical, 14)
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                                    .stroke(Color.blue.opacity(0.6), lineWidth: 1)
+                                            )
+                                            .padding(.horizontal, 16)
+                                            .padding(.bottom, 14)
+                                    }
+                                    .buttonStyle(PressedScaleButtonStyle())
+                                }
                             }
                         }
-
-                        SettingsCard {
-                            VStack(alignment: .leading, spacing: 10) {
-                                Text("すでにアカウントをお持ちの方")
-                                    .font(.system(size: 16, weight: .semibold))
-                                    .foregroundColor(.black)
-                                    .padding(.horizontal, 16)
-                                    .padding(.top, 14)
-
-                                Button(action: {
-                                    showSignIn = true
-                                }) {
-                                    Text("お持ちのアカウントでログイン")
-                                        .font(.system(size: 16, weight: .semibold))
-                                        .foregroundColor(Color.blue)
-                                        .frame(maxWidth: .infinity)
-                                        .padding(.vertical, 14)
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                                .stroke(Color.blue.opacity(0.6), lineWidth: 1)
-                                        )
-                                        .padding(.horizontal, 16)
-                                        .padding(.bottom, 14)
-                                }
-                                .buttonStyle(PressedScaleButtonStyle())
-                            }
-                        }
+                        .frame(maxWidth: 520)
+                        .frame(maxWidth: .infinity)
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 24)
                     }
-                    .frame(maxWidth: 520)
-                    .frame(maxWidth: .infinity)
-                    .padding(.horizontal, 16)
-                    .padding(.top, 8)
-                    .padding(.bottom, 24)
+                    .frame(minHeight: proxy.size.height)
                 }
             }
             .background(backgroundColor.ignoresSafeArea())
