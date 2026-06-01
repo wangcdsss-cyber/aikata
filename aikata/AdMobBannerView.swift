@@ -16,7 +16,6 @@ struct AdMobBannerView: View {
     @State private var containerWidth: CGFloat = 0
     @State private var retryCount = 0
     @State private var lastErrorText: String? = nil
-    @State private var showErrorAlert = false
     @State private var isWaitingForCallback = false
 
     var body: some View {
@@ -50,7 +49,6 @@ struct AdMobBannerView: View {
                             width: containerWidth,
                             hasFailedToLoad: $hasFailedToLoad,
                             lastErrorText: $lastErrorText,
-                            showErrorAlert: $showErrorAlert,
                             isWaitingForCallback: $isWaitingForCallback
                         )
                         if isWaitingForCallback {
@@ -79,11 +77,6 @@ struct AdMobBannerView: View {
                     hasFailedToLoad = false
                 }
             }
-        }
-        .alert("AdMob", isPresented: $showErrorAlert) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(lastErrorText ?? "")
         }
 #else
         VStack(spacing: 6) {
@@ -118,14 +111,12 @@ private struct AdMobBannerRepresentable: UIViewRepresentable {
     let width: CGFloat
     @Binding var hasFailedToLoad: Bool
     @Binding var lastErrorText: String?
-    @Binding var showErrorAlert: Bool
     @Binding var isWaitingForCallback: Bool
 
     func makeCoordinator() -> Coordinator {
         Coordinator(
             hasFailedToLoad: $hasFailedToLoad,
             lastErrorText: $lastErrorText,
-            showErrorAlert: $showErrorAlert,
             isWaitingForCallback: $isWaitingForCallback
         )
     }
@@ -161,16 +152,14 @@ private struct AdMobBannerRepresentable: UIViewRepresentable {
     final class Coordinator: NSObject, BannerViewDelegate {
         @Binding var hasFailedToLoad: Bool
         @Binding var lastErrorText: String?
-        @Binding var showErrorAlert: Bool
         @Binding var isWaitingForCallback: Bool
 
         private var didReceiveCallback = false
         private var timeoutWorkItem: DispatchWorkItem?
 
-        init(hasFailedToLoad: Binding<Bool>, lastErrorText: Binding<String?>, showErrorAlert: Binding<Bool>, isWaitingForCallback: Binding<Bool>) {
+        init(hasFailedToLoad: Binding<Bool>, lastErrorText: Binding<String?>, isWaitingForCallback: Binding<Bool>) {
             _hasFailedToLoad = hasFailedToLoad
             _lastErrorText = lastErrorText
-            _showErrorAlert = showErrorAlert
             _isWaitingForCallback = isWaitingForCallback
         }
 
@@ -190,7 +179,6 @@ private struct AdMobBannerRepresentable: UIViewRepresentable {
                     self.lastErrorText = "Timeout (no callback): 12s"
                     self.hasFailedToLoad = true
                     self.isWaitingForCallback = false
-                    self.showErrorAlert = true
                 }
             }
             timeoutWorkItem = workItem
@@ -215,7 +203,6 @@ private struct AdMobBannerRepresentable: UIViewRepresentable {
                 self.lastErrorText = "\(nsError.domain) (\(nsError.code)): \(nsError.localizedDescription)"
                 self.hasFailedToLoad = true
                 self.isWaitingForCallback = false
-                self.showErrorAlert = true
             }
         }
     }
