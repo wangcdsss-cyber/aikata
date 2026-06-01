@@ -2,6 +2,9 @@ import SwiftUI
 #if canImport(SafariServices)
 import SafariServices
 #endif
+#if canImport(FirebaseAuth)
+import FirebaseAuth
+#endif
 
 struct OnboardingView: View {
     @EnvironmentObject var authManager: AuthManager
@@ -855,12 +858,12 @@ private struct PasswordResetDoneView: View {
 private enum PasswordResetService {
     static func send(email: String) async throws {
 #if canImport(FirebaseAuth)
-        try await withCheckedThrowingContinuation { continuation in
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             Auth.auth().sendPasswordReset(withEmail: email) { error in
                 if let error {
                     continuation.resume(throwing: error)
                 } else {
-                    continuation.resume()
+                    continuation.resume(returning: ())
                 }
             }
         }
