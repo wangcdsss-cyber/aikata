@@ -77,8 +77,6 @@ private struct SettingsRootView: View {
 
     @State private var showDeleteEntryConfirm = false
     @State private var showAccountDeletion = false
-    @State private var showMessageAlert = false
-    @State private var messageAlertText = ""
 
     private var appVersion: String {
         let short = (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String) ?? "0"
@@ -108,12 +106,7 @@ private struct SettingsRootView: View {
                         SettingsDivider()
 
                         NavigationLink {
-                            EmailConfirmationView(
-                                onMessage: { text in
-                                    messageAlertText = text
-                                    showMessageAlert = true
-                                }
-                            )
+                            EmailConfirmationView()
                         } label: {
                             SettingsRow(title: "メール確認")
                         }
@@ -202,11 +195,6 @@ private struct SettingsRootView: View {
                 }
             } message: {
                 Text("アカウント削除に進みます。よろしいですか？")
-            }
-            .alert("メッセージ", isPresented: $showMessageAlert) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text(messageAlertText)
             }
             .navigationDestination(isPresented: $showAccountDeletion) {
                 AccountDeletionView()
@@ -322,10 +310,11 @@ private struct NotificationSettingsView: View {
 }
 
 private struct EmailConfirmationView: View {
-    let onMessage: (String) -> Void
-
     @State private var isSending = false
     @State private var isRefreshing = false
+    @State private var resendCooldownUntil: Date? = nil
+    @State private var showMessageAlert = false
+    @State private var messageAlertText = ""
 
     private var emailText: String {
 #if canImport(FirebaseAuth)
@@ -341,6 +330,12 @@ private struct EmailConfirmationView: View {
 #else
         return false
 #endif
+    }
+
+    private var cooldownSecondsRemaining: Int {
+        guard let until = resendCooldownUntil else { return 0 }
+        let seconds = Int(until.timeIntervalSinceNow.rounded(.up))
+        return max(0, seconds)
     }
 
     var body: some View {
@@ -363,7 +358,7 @@ private struct EmailConfirmationView: View {
                         Task { await sendVerificationEmail() }
                     }) {
                         HStack {
-                            Text("確認メールを送信")
+                            Text(isVerified ? "確認済み" : (cooldownSecondsRemaining > 0 ? "再送信まで \(cooldownSecondsRemaining)s" : "確認メールを送信"))
                                 .foregroundColor(.black)
                             Spacer()
                             if isSending {
@@ -379,6 +374,7 @@ private struct EmailConfirmationView: View {
                         .padding(.vertical, 12)
                     }
                     .buttonStyle(.plain)
+                    .disabled(isVerified || isSending || cooldownSecondsRemaining > 0)
 
                     SettingsDivider()
 
@@ -412,6 +408,11 @@ private struct EmailConfirmationView: View {
         .background(settingsBackground.ignoresSafeArea())
         .navigationTitle("メール確認")
         .tint(Color.orange)
+        .alert("メッセージ", isPresented: $showMessageAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(messageAlertText)
+        }
 #if canImport(UIKit)
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(Color.white, for: .navigationBar)
@@ -438,45 +439,102 @@ private struct EmailConfirmationView: View {
     private func sendVerificationEmail() async {
 #if canImport(FirebaseAuth)
         guard let user = Auth.auth().currentUser else {
-            onMessage("ログイン状態を確認できません。")
+            await MainActor.run {
+                messageAlertText = "ログイン状態を確認できません。"
+                showMessageAlert = true
+            }
             return
         }
-        guard let _ = user.email, !emailText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            onMessage("メールアドレスが未設定です。")
+        let trimmedEmail = (user.email ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedEmail.isEmpty else {
+            await MainActor.run {
+                messageAlertText = "メールアドレスが未設定です。"
+                showMessageAlert = true
+            }
+            return
+        }
+        if user.isEmailVerified {
+            await MainActor.run {
+                messageAlertText = "すでに確認済みです。"
+                showMessageAlert = true
+            }
             return
         }
         await MainActor.run { isSending = true }
         do {
             try await user.sendEmailVerification()
-            onMessage("確認メールを送信しました。受信ボックスをご確認ください。")
+            await MainActor.run {
+                resendCooldownUntil = Date().addingTimeInterval(30)
+                messageAlertText = "確認メールを送信しました。数分かかる場合があります。迷惑メール/プロモーションもご確認ください。\n送信先: \(trimmedEmail)"
+                showMessageAlert = true
+            }
         } catch {
-            onMessage("送信に失敗しました: \(error.localizedDescription)")
+            await MainActor.run {
+                messageAlertText = authErrorMessage(error)
+                showMessageAlert = true
+            }
         }
         await MainActor.run { isSending = false }
 #else
-        onMessage("メール確認は未対応です。")
+        await MainActor.run {
+            messageAlertText = "メール確認は未対応です。"
+            showMessageAlert = true
+        }
 #endif
     }
 
     private func refreshAuthUser() async {
 #if canImport(FirebaseAuth)
         guard let user = Auth.auth().currentUser else {
-            onMessage("ログイン状態を確認できません。")
+            await MainActor.run {
+                messageAlertText = "ログイン状態を確認できません。"
+                showMessageAlert = true
+            }
             return
         }
         await MainActor.run { isRefreshing = true }
         do {
             try await user.reload()
-            onMessage("更新しました。")
+            await MainActor.run {
+                messageAlertText = "更新しました。"
+                showMessageAlert = true
+            }
         } catch {
-            onMessage("更新に失敗しました: \(error.localizedDescription)")
+            await MainActor.run {
+                messageAlertText = "更新に失敗しました: \(error.localizedDescription)"
+                showMessageAlert = true
+            }
         }
         await MainActor.run { isRefreshing = false }
 #else
-        onMessage("確認状態の更新は未対応です。")
+        await MainActor.run {
+            messageAlertText = "確認状態の更新は未対応です。"
+            showMessageAlert = true
+        }
 #endif
     }
 }
+
+#if canImport(FirebaseAuth)
+private func authErrorMessage(_ error: Error) -> String {
+    let nsError = error as NSError
+    if let code = AuthErrorCode.Code(rawValue: nsError.code) {
+        switch code {
+        case .tooManyRequests:
+            return "送信回数が多すぎます。しばらく待ってから再度お試しください。"
+        case .networkError:
+            return "通信エラーが発生しました。ネットワーク状態を確認してください。"
+        case .userNotFound:
+            return "ユーザーが見つかりません。再ログインしてください。"
+        case .invalidRecipientEmail:
+            return "メールアドレスが無効です。"
+        default:
+            return "送信に失敗しました: \(nsError.localizedDescription) (\(nsError.domain) \(nsError.code))"
+        }
+    }
+    return "送信に失敗しました: \(nsError.localizedDescription) (\(nsError.domain) \(nsError.code))"
+}
+#endif
 
 private struct TermsOfServiceView: View {
     private let urlString = "https://changeable-pegasus-9b4.notion.site/372404b9a4d58099ba66fffe4472eb96?source=copy_link"
