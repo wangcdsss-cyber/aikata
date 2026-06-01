@@ -423,10 +423,15 @@ private struct SignInView: View {
     @State private var isSubmitting = false
     @State private var showErrorAlert = false
     @State private var errorText = ""
+    @State private var showPasswordReset = false
+    @State private var showResetDone = false
+
+    @AppStorage("auth_save_email_enabled") private var saveEmailEnabled = false
+    @AppStorage("auth_saved_email") private var savedEmail = ""
 
     private var backgroundColor: Color {
 #if canImport(UIKit)
-        return Color(uiColor: .systemGroupedBackground)
+        return Color(red: 0.97, green: 0.94, blue: 0.86)
 #else
         return Color.gray.opacity(0.08)
 #endif
@@ -439,73 +444,108 @@ private struct SignInView: View {
     var body: some View {
         ZStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
-                    SettingsCard {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("メールアドレス")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundColor(.black)
-                            TextField("メールアドレス", text: $email)
-                                .textInputAutocapitalization(.never)
-                                .keyboardType(.emailAddress)
-                                .autocorrectionDisabled()
-                                .padding(12)
-                                .background(Color.white)
-                                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                        .stroke(Color.black.opacity(0.08), lineWidth: 1)
-                                )
+                VStack(alignment: .leading, spacing: 18) {
+                    VStack(alignment: .leading, spacing: 14) {
+                        Text("メールアドレス")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundColor(.black)
 
-                            Text("パスワード")
-                                .font(.system(size: 14, weight: .semibold))
+                        TextField("メールアドレス", text: $email)
+                            .textInputAutocapitalization(.never)
+                            .keyboardType(.emailAddress)
+                            .autocorrectionDisabled()
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 12)
+                            .background(Color.white)
+                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                            )
+
+                        Text("パスワード")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundColor(.black)
+                            .padding(.top, 8)
+
+                        SecureField("パスワード", text: $password)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 12)
+                            .background(Color.white)
+                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                            )
+
+                        Toggle(isOn: $saveEmailEnabled) {
+                            Text("メールアドレスを保存する")
+                                .font(.system(size: 16, weight: .semibold))
                                 .foregroundColor(.black)
-                                .padding(.top, 4)
-                            SecureField("パスワード", text: $password)
-                                .textInputAutocapitalization(.never)
-                                .autocorrectionDisabled()
-                                .padding(12)
-                                .background(Color.white)
-                                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                        .stroke(Color.black.opacity(0.08), lineWidth: 1)
-                                )
                         }
-                        .padding(16)
+                        .tint(Color.gray.opacity(0.7))
+                        .padding(.top, 10)
                     }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 10)
 
                     Button(action: {
                         Task { await submit() }
                     }) {
-                        Text("ログイン")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
-                            .background(canSubmit ? Color.orange : Color.gray.opacity(0.5))
-                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        HStack(spacing: 10) {
+                            Image(systemName: "key.fill")
+                                .font(.system(size: 16, weight: .semibold))
+                            Text("ログイン")
+                                .font(.system(size: 18, weight: .semibold))
+                        }
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(canSubmit ? Color.orange : Color.gray.opacity(0.5))
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                     }
                     .buttonStyle(PressedScaleButtonStyle())
                     .disabled(!canSubmit || isSubmitting)
+                    .padding(.horizontal, 16)
 
-                    Button(action: { dismiss() }) {
-                        Text("キャンセル")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundColor(Color.black.opacity(0.75))
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                    .stroke(Color.black.opacity(0.12), lineWidth: 1)
-                            )
+                    VStack(alignment: .leading, spacing: 14) {
+                        Button(action: {
+                            showPasswordReset = true
+                        }) {
+                            HStack(spacing: 10) {
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundColor(Color.black.opacity(0.6))
+                                Text("パスワードを忘れた方はこちら")
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .foregroundColor(Color.black.opacity(0.7))
+                                Spacer()
+                            }
+                        }
+                        .buttonStyle(.plain)
+
+                        Button(action: {
+                            dismiss()
+                        }) {
+                            HStack(spacing: 10) {
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundColor(Color.black.opacity(0.6))
+                                Text("キャンセル")
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .foregroundColor(Color.black.opacity(0.7))
+                                Spacer()
+                            }
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(PressedScaleButtonStyle())
-                    .disabled(isSubmitting)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 4)
                 }
-                .frame(maxWidth: 520)
-                .frame(maxWidth: .infinity)
-                .padding(.horizontal, 16)
+                .frame(maxWidth: 520, alignment: .leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.vertical, 18)
             }
             .background(backgroundColor.ignoresSafeArea())
@@ -514,19 +554,40 @@ private struct SignInView: View {
 #if canImport(UIKit)
             .navigationBarTitleDisplayMode(.inline)
 #endif
+            .navigationBarBackButtonHidden(true)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
+                ToolbarItem(placement: .topBarLeading) {
                     Button(action: { dismiss() }) {
-                        Text("戻る")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(Color.orange)
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(Color.blue)
+                            .padding(6)
+                            .contentShape(Rectangle())
                     }
+                    .buttonStyle(PressedScaleButtonStyle())
+                    .accessibilityLabel("戻る")
                 }
             }
             .alert("エラー", isPresented: $showErrorAlert) {
                 Button("OK", role: .cancel) {}
             } message: {
                 Text(errorText)
+            }
+            .navigationDestination(isPresented: $showPasswordReset) {
+                PasswordResetRequestView(
+                    defaultEmail: email,
+                    onCompleted: {
+                        showResetDone = true
+                    }
+                )
+            }
+            .navigationDestination(isPresented: $showResetDone) {
+                PasswordResetDoneView()
+            }
+            .onAppear {
+                if saveEmailEnabled, !savedEmail.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, email.isEmpty {
+                    email = savedEmail
+                }
             }
 
             if isSubmitting || authManager.isLoading {
@@ -559,7 +620,253 @@ private struct SignInView: View {
             }
             return
         }
+        if saveEmailEnabled {
+            savedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        } else {
+            savedEmail = ""
+        }
         await MainActor.run { isSubmitting = false }
+    }
+}
+
+private struct PasswordResetRequestView: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var email: String
+    @State private var isSending = false
+    @State private var showErrorAlert = false
+    @State private var errorText = ""
+
+    let onCompleted: () -> Void
+
+    init(defaultEmail: String, onCompleted: @escaping () -> Void) {
+        _email = State(initialValue: defaultEmail)
+        self.onCompleted = onCompleted
+    }
+
+    private var backgroundColor: Color {
+#if canImport(UIKit)
+        return Color(red: 0.97, green: 0.94, blue: 0.86)
+#else
+        return Color.gray.opacity(0.08)
+#endif
+    }
+
+    private var canSend: Bool {
+        !email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    var body: some View {
+        ZStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("パスワードリセット")
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundColor(.black)
+                        .padding(.horizontal, 16)
+                        .padding(.top, 10)
+
+                    Text("登録したメールアドレスに、パスワード再設定用のメールを送信します。")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(Color.black.opacity(0.65))
+                        .padding(.horizontal, 16)
+
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("メールアドレス")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundColor(.black)
+
+                        TextField("メールアドレス", text: $email)
+                            .textInputAutocapitalization(.never)
+                            .keyboardType(.emailAddress)
+                            .autocorrectionDisabled()
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 12)
+                            .background(Color.white)
+                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                            )
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 4)
+
+                    Button(action: {
+                        Task { await sendReset() }
+                    }) {
+                        Text("メールを送信する")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(canSend ? Color.orange : Color.gray.opacity(0.5))
+                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    }
+                    .buttonStyle(PressedScaleButtonStyle())
+                    .disabled(!canSend || isSending)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 6)
+
+                    Button(action: { dismiss() }) {
+                        Text("キャンセル")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundColor(Color.black.opacity(0.7))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .stroke(Color.black.opacity(0.12), lineWidth: 1)
+                            )
+                    }
+                    .buttonStyle(PressedScaleButtonStyle())
+                    .disabled(isSending)
+                    .padding(.horizontal, 16)
+                }
+                .frame(maxWidth: 520, alignment: .leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.vertical, 18)
+            }
+            .background(backgroundColor.ignoresSafeArea())
+            .navigationTitle("パスワードリセット")
+            .tint(Color.orange)
+#if canImport(UIKit)
+            .navigationBarTitleDisplayMode(.inline)
+#endif
+            .navigationBarBackButtonHidden(true)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button(action: { dismiss() }) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(Color.blue)
+                            .padding(6)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(PressedScaleButtonStyle())
+                }
+            }
+            .alert("エラー", isPresented: $showErrorAlert) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(errorText)
+            }
+
+            if isSending {
+                VStack(spacing: 10) {
+                    ProgressView()
+                    Text("送信中…")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(Color.black.opacity(0.7))
+                }
+                .padding(18)
+                .background(Color.white)
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .stroke(Color.black.opacity(0.05), lineWidth: 1)
+                )
+            }
+        }
+    }
+
+    private func sendReset() async {
+        let trimmed = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        await MainActor.run { isSending = true }
+        do {
+            try await PasswordResetService.send(email: trimmed)
+        } catch {
+            await MainActor.run {
+                errorText = error.localizedDescription
+                showErrorAlert = true
+                isSending = false
+            }
+            return
+        }
+        await MainActor.run {
+            isSending = false
+        }
+        onCompleted()
+    }
+}
+
+private struct PasswordResetDoneView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    private var backgroundColor: Color {
+#if canImport(UIKit)
+        return Color(red: 0.97, green: 0.94, blue: 0.86)
+#else
+        return Color.gray.opacity(0.08)
+#endif
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                Text("送信しました")
+                    .font(.system(size: 22, weight: .bold))
+                    .foregroundColor(.black)
+                    .padding(.top, 10)
+
+                Text("パスワード再設定用のメールを送信しました。受信ボックスをご確認ください。")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(Color.black.opacity(0.65))
+
+                Button(action: { dismiss() }) {
+                    Text("ログイン画面へ戻る")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(Color.orange)
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                }
+                .buttonStyle(PressedScaleButtonStyle())
+                .padding(.top, 10)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 18)
+            .frame(maxWidth: 520, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .background(backgroundColor.ignoresSafeArea())
+        .navigationTitle("完了")
+        .tint(Color.orange)
+#if canImport(UIKit)
+        .navigationBarTitleDisplayMode(.inline)
+#endif
+        .navigationBarBackButtonHidden(true)
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button(action: { dismiss() }) {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(Color.blue)
+                        .padding(6)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(PressedScaleButtonStyle())
+            }
+        }
+    }
+}
+
+private enum PasswordResetService {
+    static func send(email: String) async throws {
+#if canImport(FirebaseAuth)
+        try await withCheckedThrowingContinuation { continuation in
+            Auth.auth().sendPasswordReset(withEmail: email) { error in
+                if let error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume()
+                }
+            }
+        }
+#else
+        throw NSError(domain: "Auth", code: 501, userInfo: [NSLocalizedDescriptionKey: "FirebaseAuth が未設定です。"])
+#endif
     }
 }
 
