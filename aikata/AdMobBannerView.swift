@@ -16,48 +16,21 @@ struct AdMobBannerView: View {
     @State private var containerWidth: CGFloat = 0
     @State private var retryCount = 0
     @State private var lastErrorText: String? = nil
-    @State private var isWaitingForCallback = false
 
     var body: some View {
 #if canImport(GoogleMobileAds)
         VStack(spacing: 0) {
             if containerWidth > 0 {
                 if hasFailedToLoad {
-                    VStack(spacing: 6) {
-                        Text("AdMob")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundColor(Color.white.opacity(0.9))
-                        Text(lastErrorText ?? "広告の読み込みに失敗しました。")
-                            .font(.system(size: 11))
-                            .foregroundColor(Color.red.opacity(0.9))
-                            .multilineTextAlignment(.center)
-                            .lineLimit(3)
-                            .padding(.horizontal, 12)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .frame(height: bannerHeight(for: containerWidth))
-                    .padding(.vertical, verticalPadding)
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        hasFailedToLoad = false
-                        isWaitingForCallback = false
-                    }
+                    Color.clear
+                        .frame(height: 0)
                 } else {
-                    ZStack {
-                        AdMobBannerRepresentable(
-                            adUnitId: adUnitId,
-                            width: containerWidth,
-                            hasFailedToLoad: $hasFailedToLoad,
-                            lastErrorText: $lastErrorText,
-                            isWaitingForCallback: $isWaitingForCallback
-                        )
-                        if isWaitingForCallback {
-                            Text("読み込み中…（応答待ち）")
-                                .font(.system(size: 11))
-                                .foregroundColor(Color.white.opacity(0.85))
-                                .padding(.horizontal, 12)
-                        }
-                    }
+                    AdMobBannerRepresentable(
+                        adUnitId: adUnitId,
+                        width: containerWidth,
+                        hasFailedToLoad: $hasFailedToLoad,
+                        lastErrorText: $lastErrorText
+                    )
                     .frame(height: bannerHeight(for: containerWidth))
                     .padding(.vertical, verticalPadding)
                 }
@@ -79,21 +52,7 @@ struct AdMobBannerView: View {
             }
         }
 #else
-        VStack(spacing: 6) {
-            Text("AdMob")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(Color.white.opacity(0.9))
-            Text("GoogleMobileAds がアプリにリンクされていません。（canImport(GoogleMobileAds) = false）")
-                .font(.system(size: 11))
-                .foregroundColor(Color.red.opacity(0.9))
-                .multilineTextAlignment(.center)
-                .lineLimit(3)
-                .padding(.horizontal, 12)
-        }
-        .frame(maxWidth: .infinity)
-        .frame(height: 50)
-        .padding(.vertical, verticalPadding)
-        .background(Color.black)
+        EmptyView()
 #endif
     }
 
@@ -111,13 +70,11 @@ private struct AdMobBannerRepresentable: UIViewRepresentable {
     let width: CGFloat
     @Binding var hasFailedToLoad: Bool
     @Binding var lastErrorText: String?
-    @Binding var isWaitingForCallback: Bool
 
     func makeCoordinator() -> Coordinator {
         Coordinator(
             hasFailedToLoad: $hasFailedToLoad,
-            lastErrorText: $lastErrorText,
-            isWaitingForCallback: $isWaitingForCallback
+            lastErrorText: $lastErrorText
         )
     }
 
@@ -152,21 +109,18 @@ private struct AdMobBannerRepresentable: UIViewRepresentable {
     final class Coordinator: NSObject, BannerViewDelegate {
         @Binding var hasFailedToLoad: Bool
         @Binding var lastErrorText: String?
-        @Binding var isWaitingForCallback: Bool
 
         private var didReceiveCallback = false
         private var timeoutWorkItem: DispatchWorkItem?
 
-        init(hasFailedToLoad: Binding<Bool>, lastErrorText: Binding<String?>, isWaitingForCallback: Binding<Bool>) {
+        init(hasFailedToLoad: Binding<Bool>, lastErrorText: Binding<String?>) {
             _hasFailedToLoad = hasFailedToLoad
             _lastErrorText = lastErrorText
-            _isWaitingForCallback = isWaitingForCallback
         }
 
         func didStartLoading() {
             DispatchQueue.main.async {
                 self.hasFailedToLoad = false
-                self.isWaitingForCallback = true
             }
 
             didReceiveCallback = false
@@ -178,7 +132,6 @@ private struct AdMobBannerRepresentable: UIViewRepresentable {
                 DispatchQueue.main.async {
                     self.lastErrorText = "Timeout (no callback): 12s"
                     self.hasFailedToLoad = true
-                    self.isWaitingForCallback = false
                 }
             }
             timeoutWorkItem = workItem
@@ -190,7 +143,6 @@ private struct AdMobBannerRepresentable: UIViewRepresentable {
             timeoutWorkItem?.cancel()
             DispatchQueue.main.async {
                 self.hasFailedToLoad = false
-                self.isWaitingForCallback = false
                 self.lastErrorText = nil
             }
         }
@@ -202,7 +154,6 @@ private struct AdMobBannerRepresentable: UIViewRepresentable {
             DispatchQueue.main.async {
                 self.lastErrorText = "\(nsError.domain) (\(nsError.code)): \(nsError.localizedDescription)"
                 self.hasFailedToLoad = true
-                self.isWaitingForCallback = false
             }
         }
     }

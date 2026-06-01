@@ -141,8 +141,4 @@ struct ProfileContentView: View {
     }
 }
 
-#if DEBUG
-private let profileBannerAdUnitId = "ca-app-pub-3940256099942544/2934735716"
-#else
 private let profileBannerAdUnitId = "ca-app-pub-8660118960143497/6461285965"
-#endif
