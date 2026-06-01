@@ -226,8 +226,8 @@ private struct SignUpView: View {
 
                     SettingsCard {
                         VStack(spacing: 0) {
-                            LabeledField(title: "姓名", required: true) {
-                                TextField("姓名", text: $name)
+                            LabeledField(title: "ニックネーム", required: true) {
+                                TextField("ニックネーム", text: $name)
                                     .textInputAutocapitalization(.words)
                                     .autocorrectionDisabled()
                             }
@@ -335,10 +335,14 @@ private struct SignUpView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(action: { dismiss() }) {
-                        Text("戻る")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(Color.orange)
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(Color.blue)
+                            .padding(6)
+                            .contentShape(Rectangle())
                     }
+                    .buttonStyle(PressedScaleButtonStyle())
+                    .accessibilityLabel("戻る")
                 }
             }
             .alert("登録内容の確認", isPresented: $showConfirmAlert) {
