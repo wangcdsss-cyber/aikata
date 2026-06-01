@@ -7,19 +7,24 @@ struct ProfileContentView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                profileHeader
+            VStack(spacing: 0) {
+                AdMobBannerView(adUnitId: profileBannerAdUnitId, verticalPadding: 6)
+                    .padding(.top, 4)
 
-                Divider()
-                    .background(Color.white.opacity(0.15))
+                VStack(alignment: .leading, spacing: 16) {
+                    profileHeader
 
-                introSection
+                    Divider()
+                        .background(Color.white.opacity(0.15))
 
-                detailSection
+                    introSection
+
+                    detailSection
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+                .padding(.bottom, 24)
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 16)
-            .padding(.bottom, 24)
         }
     }
 
@@ -136,3 +141,4 @@ struct ProfileContentView: View {
     }
 }
 
+private let profileBannerAdUnitId = "ca-app-pub-8660118960143497/6461285965"

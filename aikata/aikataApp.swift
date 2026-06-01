@@ -6,14 +6,23 @@
 //
 
 import SwiftUI
+#if canImport(FirebaseCore)
 import FirebaseCore
+#endif
 
 class AppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
+#if canImport(FirebaseCore)
         FirebaseApp.configure()
+#endif
         AppAppearance.configure()
+        AdMobManager.shared.configureOnLaunch()
         return true
+    }
+
+    func applicationDidBecomeActive(_ application: UIApplication) {
+        AdMobManager.shared.requestConsentAndStartAdsIfNeeded()
     }
 }
 

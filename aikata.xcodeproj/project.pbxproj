@@ -13,15 +13,31 @@
 		99121BD22FAAFF4900171F8F /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 99121BD12FAAFF4900171F8F /* FirebaseFirestore */; };
 		99121BD42FAAFF4900171F8F /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = 99121BD32FAAFF4900171F8F /* FirebaseMessaging */; };
 		99121BD62FAAFF4900171F8F /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = 99121BD52FAAFF4900171F8F /* FirebaseStorage */; };
+		99B9E4FA2FCD5F64002B72DC /* GoogleMobileAds in Frameworks */ = {isa = PBXBuildFile; productRef = 99B9E4F92FCD5F64002B72DC /* GoogleMobileAds */; };
+		99CF45F22FCAC7C200DBD7C9 /* StoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 99CF45F12FCAC7C200DBD7C9 /* StoreKit.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		99121B4D2FAAF48C00171F8F /* aikata.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = aikata.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		99CF45F12FCAC7C200DBD7C9 /* StoreKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = StoreKit.framework; path = System/Library/Frameworks/StoreKit.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		99B9E4FC2FCD5FCF002B72DC /* Exceptions for "aikata" folder in "aikata" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 99121B4C2FAAF48C00171F8F /* aikata */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		99121B4F2FAAF48C00171F8F /* aikata */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				99B9E4FC2FCD5FCF002B72DC /* Exceptions for "aikata" folder in "aikata" target */,
+			);
 			path = aikata;
 			sourceTree = "<group>";
 		};
@@ -33,8 +49,10 @@
 			buildActionMask = 2147483647;
 			files = (
 				99121BD02FAAFF4900171F8F /* FirebaseCrashlytics in Frameworks */,
+				99CF45F22FCAC7C200DBD7C9 /* StoreKit.framework in Frameworks */,
 				99121BD22FAAFF4900171F8F /* FirebaseFirestore in Frameworks */,
 				99121BD42FAAFF4900171F8F /* FirebaseMessaging in Frameworks */,
+				99B9E4FA2FCD5F64002B72DC /* GoogleMobileAds in Frameworks */,
 				99121BCC2FAAFF4900171F8F /* FirebaseAnalytics in Frameworks */,
 				99121BCE2FAAFF4900171F8F /* FirebaseAuth in Frameworks */,
 				99121BD62FAAFF4900171F8F /* FirebaseStorage in Frameworks */,
@@ -48,6 +66,7 @@
 			isa = PBXGroup;
 			children = (
 				99121B4F2FAAF48C00171F8F /* aikata */,
+				99CF45F02FCAC7C200DBD7C9 /* Frameworks */,
 				99121B4E2FAAF48C00171F8F /* Products */,
 			);
 			sourceTree = "<group>";
@@ -58,6 +77,14 @@
 				99121B4D2FAAF48C00171F8F /* aikata.app */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		99CF45F02FCAC7C200DBD7C9 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				99CF45F12FCAC7C200DBD7C9 /* StoreKit.framework */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -86,6 +113,7 @@
 				99121BD12FAAFF4900171F8F /* FirebaseFirestore */,
 				99121BD32FAAFF4900171F8F /* FirebaseMessaging */,
 				99121BD52FAAFF4900171F8F /* FirebaseStorage */,
+				99B9E4F92FCD5F64002B72DC /* GoogleMobileAds */,
 			);
 			productName = aikata;
 			productReference = 99121B4D2FAAF48C00171F8F /* aikata.app */;
@@ -118,6 +146,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				99121BCA2FAAFF4900171F8F /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+				99B9E4F82FCD5F64002B72DC /* XCRemoteSwiftPackageReference "swift-package-manager-google-mobile-ads" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 99121B4E2FAAF48C00171F8F /* Products */;
@@ -281,6 +310,7 @@
 				DEVELOPMENT_TEAM = MU974KU4HD;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = aikata/Info.plist;
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "選択した画像を処理するため、写真ライブラリへのアクセスが必要です。";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "チャットで画像を送信するため、写真ライブラリへのアクセスが必要です。";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -316,6 +346,7 @@
 				DEVELOPMENT_TEAM = MU974KU4HD;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = aikata/Info.plist;
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "選択した画像を処理するため、写真ライブラリへのアクセスが必要です。";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "チャットで画像を送信するため、写真ライブラリへのアクセスが必要です。";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -373,6 +404,14 @@
 				minimumVersion = 12.13.0;
 			};
 		};
+		99B9E4F82FCD5F64002B72DC /* XCRemoteSwiftPackageReference "swift-package-manager-google-mobile-ads" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/googleads/swift-package-manager-google-mobile-ads";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 13.4.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -405,6 +444,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 99121BCA2FAAFF4900171F8F /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseStorage;
+		};
+		99B9E4F92FCD5F64002B72DC /* GoogleMobileAds */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 99B9E4F82FCD5F64002B72DC /* XCRemoteSwiftPackageReference "swift-package-manager-google-mobile-ads" */;
+			productName = GoogleMobileAds;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

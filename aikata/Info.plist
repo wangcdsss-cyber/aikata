@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>GADApplicationIdentifier</key>
+	<string>ca-app-pub-8660118960143497~8658405591</string>
+	<key>NSUserTrackingUsageDescription</key>
+	<string>より関連性の高い広告表示のため、トラッキングの許可をお願いします。</string>
+</dict>
+</plist>
